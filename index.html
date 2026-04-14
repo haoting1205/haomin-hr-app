@@ -71,6 +71,15 @@ body{font-family:'Noto Sans TC',sans-serif;background:#eef2f7;color:var(--gray6)
 </div>
 <button class="btn btn-blue" onclick="appLogin()">登入</button>
 <div id="app-err" style="margin-top:10px;color:var(--red);font-size:13px;display:none"></div>
+<button onclick="showAppForgot()" style="margin-top:12px;background:none;border:none;color:#2563eb;font-size:13px;cursor:pointer;font-family:inherit;text-decoration:underline">忘記密碼？</button>
+<div id="app-forgot" style="display:none;margin-top:14px;text-align:left;background:var(--gray1);border-radius:10px;padding:16px">
+<div style="font-size:14px;font-weight:700;color:#0f1b35;margin-bottom:8px">🔑 密碼重設</div>
+<div style="font-size:12px;color:#4b5680;margin-bottom:12px">請輸入您的帳號（工號），系統將重設密碼為預設值</div>
+<div class="form-group"><span class="fl">帳號（工號）</span><input class="fi" id="forgot-user" placeholder="如 hm0001"></div>
+<div class="form-group"><span class="fl">身分證字號（驗證身份）</span><input class="fi" id="forgot-id" placeholder="身分證字號"></div>
+<button class="btn btn-blue" onclick="doAppForgot()">確認重設密碼</button>
+<button class="btn btn-outline" style="font-size:13px;padding:8px" onclick="hideAppForgot()">返回登入</button>
+</div>
 <div style="margin-top:20px;padding:14px;background:var(--gray1);border-radius:10px;text-align:left;display:none">
 <div style="font-size:12px;font-weight:700;color:var(--gray6);margin-bottom:6px">⚙ Firebase 設定</div>
 <div class="form-group"><span class="fl">API Key</span><input class="fi" id="app-fb-key" style="font-size:12px;padding:8px 10px"></div>
@@ -172,7 +181,8 @@ body{font-family:'Noto Sans TC',sans-serif;background:#eef2f7;color:var(--gray6)
 <div class="card-title">👤 個人資料</div>
 <div id="me-info">載入中...</div>
 </div>
-<button class="btn" style="background:var(--red);color:#fff;margin-top:14px" onclick="appLogout()">🚪 登出</button>
+<button class="btn btn-blue" style="margin-top:14px" onclick="appChangePass()">🔐 修改密碼</button>
+<button class="btn" style="background:var(--red);color:#fff;margin-top:8px" onclick="appLogout()">🚪 登出</button>
 </div>
 
 <!-- 底部 Tab -->
@@ -239,6 +249,10 @@ function renderPay(){if(!curEmp){return}var months=Object.keys(payHistory).sort(
 
 function renderMe(){if(!curEmp)return;var e=curEmp;var h='';var fields=[['姓名',e.name],['職稱',e.role],['門市',e.store],['到職日',e.hire_date],['電話',e.phone],['Email',e.email],['地址',e.address]];fields.forEach(function(f){h+='<div style="display:flex;padding:10px 0;border-bottom:1px solid var(--gray1)"><span style="min-width:70px;font-size:13px;color:var(--gray4)">'+f[0]+'</span><span style="font-size:14px;font-weight:600">'+(f[1]||'─')+'</span></div>'});document.getElementById('me-info').innerHTML=h}
 
+function showAppForgot(){document.getElementById('app-forgot').style.display='block';document.getElementById('app-err').style.display='none'}
+function hideAppForgot(){document.getElementById('app-forgot').style.display='none';document.getElementById('forgot-user').value='';document.getElementById('forgot-id').value=''}
+function doAppForgot(){var user=document.getElementById('forgot-user').value.trim().toLowerCase();var idNum=document.getElementById('forgot-id').value.trim();if(!user||!idNum){alert('請填寫帳號和身分證字號');return}if(!db){alert('無法連線，請稍後再試');return}db.collection(fbEnv+'_hrdata').doc('accounts').get().then(function(doc){if(!doc.exists){alert('系統錯誤');return}var data=doc.data();var accounts=data.userAccounts||[];var acct=accounts.find(function(a){return a.user.toLowerCase()===user});if(!acct){alert('查無此帳號');return}if(!acct.empId){alert('此帳號未綁定員工，請聯繫管理員');return}db.collection(fbEnv+'_employees').get().then(function(s){var emp=null;s.forEach(function(d2){var e=Object.assign({id:d2.id},d2.data());if(e.id===acct.empId)emp=e});if(!emp){alert('查無員工資料，請聯繫管理員');return}if(emp.id_num!==idNum){alert('身分證字號驗證失敗');return}var newPass=user+'aa';acct.pass=newPass;db.collection(fbEnv+'_hrdata').doc('accounts').set({userAccounts:accounts}).then(function(){alert('✅ 密碼已重設\n\n帳號：'+user+'\n新密碼：'+newPass+'\n\n請登入後立即修改密碼');hideAppForgot()}).catch(function(e){alert('重設失敗：'+e.message)})}).catch(function(e){alert('驗證失敗：'+e.message)})}).catch(function(e){alert('連線失敗：'+e.message)})}
+function appChangePass(){if(!curAcct){alert('請先登入');return}var oldP=prompt('請輸入目前密碼：');if(!oldP)return;if(oldP!==curAcct.pass){alert('密碼錯誤');return}var newP=prompt('請輸入新密碼（8~16字元，英文+數字）：');if(!newP)return;if(newP.length<8||newP.length>16){alert('密碼長度需8~16字元');return}if(!/[a-zA-Z]/.test(newP)||!/[0-9]/.test(newP)){alert('密碼需同時包含英文和數字');return}var confirmP=prompt('請再次輸入新密碼確認：');if(confirmP!==newP){alert('兩次輸入不一致');return}if(db){db.collection(fbEnv+'_hrdata').doc('accounts').get().then(function(doc){if(!doc.exists)return;var data=doc.data();var accounts=data.userAccounts||[];var acct=accounts.find(function(a){return a.user===curAcct.user});if(acct){acct.pass=newP;db.collection(fbEnv+'_hrdata').doc('accounts').set({userAccounts:accounts});curAcct.pass=newP;if(document.getElementById('app-remember').checked){localStorage.setItem('hm_app_session',JSON.stringify({user:curAcct.user,pass:newP}))}alert('✅ 密碼已修改成功')}}).catch(function(e){alert('修改失敗：'+e.message)})}else{alert('請連線後再修改密碼')}}
 // Init
 if(!localStorage.getItem('hm_app_fb')){localStorage.setItem('hm_app_fb',JSON.stringify(_DEFAULT_FB))}initFb();
 try{var fb=JSON.parse(localStorage.getItem('hm_app_fb'));if(fb){document.getElementById('app-fb-key').value=fb.apiKey||'';document.getElementById('app-fb-proj').value=fb.projectId||''}}catch(e){}
