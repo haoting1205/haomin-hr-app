@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0f1b35">
+<title>好洺餐飲 員工APP</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.14.1/firebase-app-compat.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.14.1/firebase-firestore-compat.min.js"></script>
+<style>
+:root{--navy:#0f1b35;--gold:#f0c96a;--blue:#2563eb;--green:#16a34a;--red:#dc2626;--gray1:#f5f6fa;--gray2:#e8eaf0;--gray4:#8892b0;--gray6:#1e2340;--white:#fff}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:'Noto Sans TC',sans-serif;background:#eef2f7;color:var(--gray6);font-size:15px;min-height:100vh;overflow-x:hidden}
+.app-bar{background:var(--navy);color:var(--gold);padding:14px 18px;font-size:17px;font-weight:700;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;letter-spacing:.5px}
+.app-bar .sub{font-size:11px;color:var(--gray4);font-weight:400;display:block}
+.user-info{text-align:right;font-size:11px;color:var(--gray4);line-height:1.5}
+.user-info b{color:var(--gold);font-size:13px}
+.screen{display:none;padding:16px;padding-bottom:90px}.screen.active{display:block}
+.card{background:var(--white);border-radius:14px;padding:18px;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.card-title{font-size:15px;font-weight:700;color:var(--navy);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.stat{background:var(--gray1);border-radius:12px;padding:14px;text-align:center}
+.stat-val{font-size:26px;font-weight:700;font-family:'JetBrains Mono',monospace}
+.stat-label{font-size:11px;color:var(--gray4);margin-top:2px}
+.btn{display:block;width:100%;padding:16px;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:10px;transition:transform .1s}
+.btn:active{transform:scale(.97)}
+.btn-green{background:#166534;color:#fff}.btn-red{background:#991b1b;color:#fff}
+.btn-yellow{background:#f59e0b;color:#fff}.btn-blue{background:#1e40af;color:#fff}
+.btn-outline{background:var(--white);border:2px solid var(--gray2);color:var(--gray6)}
+.punch-clock{font-size:48px;font-weight:700;font-family:'JetBrains Mono',monospace;text-align:center;color:var(--navy);margin:10px 0}
+.punch-date{text-align:center;font-size:14px;color:var(--gray4);margin-bottom:16px}
+.punch-result{padding:18px;border-radius:12px;text-align:center;margin-bottom:14px;display:none}
+.gps-status{padding:10px 14px;border-radius:10px;background:var(--gray1);font-size:12px;color:var(--gray4);margin-bottom:14px;text-align:center}
+.list-item{padding:14px 0;border-bottom:1px solid var(--gray2);display:flex;align-items:center;gap:12px}
+.list-item:last-child{border-bottom:none}
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700}
+.tab-bar{position:fixed;bottom:0;left:0;right:0;background:var(--white);border-top:1px solid var(--gray2);display:flex;z-index:100;padding-bottom:env(safe-area-inset-bottom)}
+.tab-btn{flex:1;padding:8px 0;text-align:center;font-size:10px;color:var(--gray4);cursor:pointer;transition:color .15s;border:none;background:none;font-family:inherit}
+.tab-btn.active{color:var(--navy);font-weight:700}
+.tab-btn .icon{font-size:22px;display:block;margin-bottom:2px}
+.fi{width:100%;padding:12px 14px;border:2px solid var(--gray2);border-radius:10px;font-size:15px;font-family:inherit;outline:none;background:var(--white);color:var(--gray6)}
+.fi:focus{border-color:var(--blue)}
+.fl{font-size:11px;font-weight:700;color:var(--gray4);margin-bottom:4px;display:block;text-transform:uppercase;letter-spacing:.5px}
+.form-group{margin-bottom:14px}
+.login-screen{position:fixed;inset:0;background:linear-gradient(135deg,#0a1220,#1a2d52,#0f1b35);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px}
+.login-box{background:var(--white);border-radius:20px;padding:36px 28px;width:100%;max-width:360px;text-align:center}
+.login-box h1{font-size:22px;color:var(--navy);margin-bottom:4px}
+.login-box .sub{font-size:13px;color:var(--gray4);margin-bottom:24px;letter-spacing:1px}
+.punch-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--gray1);font-size:13px}
+.sched-day{display:flex;align-items:center;padding:10px 0;border-bottom:1px solid var(--gray1);gap:10px}
+.sched-day .day{min-width:50px;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:14px}
+.sched-day .time{font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:#0369a1}
+.sched-day .leave{font-weight:700;font-size:13px}
+.offline-bar{background:#f59e0b;color:#fff;text-align:center;padding:6px;font-size:12px;font-weight:700;display:none}
+</style>
+</head>
+<body>
+
+<div class="login-screen" id="login-screen">
+<div class="login-box">
+<div style="font-size:40px;margin-bottom:12px">🍽</div>
+<h1>好洺餐飲事業有限公司</h1>
+<div class="sub">員工APP</div>
+<div class="form-group"><input class="fi" id="app-user" placeholder="帳號"></div>
+<div class="form-group"><input class="fi" id="app-pass" type="password" placeholder="密碼" onkeydown="if(event.key==='Enter')appLogin()"></div>
+<div class="form-group" style="display:flex;align-items:center;gap:6px;justify-content:flex-start">
+<input type="checkbox" id="app-remember" style="width:16px;height:16px"><label for="app-remember" style="font-size:13px;color:var(--gray4)">記住我</label>
+</div>
+<button class="btn btn-blue" onclick="appLogin()">登入</button>
+<div id="app-err" style="margin-top:10px;color:var(--red);font-size:13px;display:none"></div>
+<div style="margin-top:20px;padding:14px;background:var(--gray1);border-radius:10px;text-align:left;display:none">
+<div style="font-size:12px;font-weight:700;color:var(--gray6);margin-bottom:6px">⚙ Firebase 設定</div>
+<div class="form-group"><span class="fl">API Key</span><input class="fi" id="app-fb-key" style="font-size:12px;padding:8px 10px"></div>
+<div class="form-group"><span class="fl">Project ID</span><input class="fi" id="app-fb-proj" style="font-size:12px;padding:8px 10px"></div>
+<button class="btn btn-outline" style="font-size:12px;padding:10px" onclick="saveAppFb()">儲存 Firebase 設定</button>
+</div>
+</div>
+</div>
+
+<div class="offline-bar" id="offline-bar">📡 離線模式 - 資料暫存本機</div>
+
+<div class="app-bar">
+<div>🍽 好洺餐飲<span class="sub">員工APP</span></div>
+<div class="user-info"><b id="app-name">─</b><br><span id="app-role">─</span></div>
+</div>
+
+<!-- 首頁 -->
+<div class="screen active" id="screen-home">
+<div class="card" style="background:linear-gradient(135deg,#0f1b35,#1a2d52);color:#fff">
+<div style="display:flex;align-items:center;gap:14px">
+<div style="width:56px;height:56px;border-radius:50%;background:rgba(240,201,106,.2);color:var(--gold);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700" id="home-avatar">─</div>
+<div><div style="font-size:20px;font-weight:700" id="home-name">─</div><div style="font-size:12px;color:var(--gray4)" id="home-sub">─</div></div>
+</div>
+</div>
+<div class="stat-grid">
+<div class="stat"><div class="stat-val" style="color:#0369a1" id="home-vac">─</div><div class="stat-label">特休餘額(天)</div></div>
+<div class="stat"><div class="stat-val" style="color:#166534" id="home-attend">─</div><div class="stat-label">本月出勤(天)</div></div>
+</div>
+<button class="btn btn-green" onclick="switchScreen('punch')" style="font-size:18px;padding:20px">⏰ 立即打卡</button>
+<button class="btn btn-outline" onclick="switchScreen('sched')">📅 查看班表</button>
+<button class="btn btn-outline" onclick="switchScreen('leave')">📝 請假申請</button>
+</div>
+
+<!-- 打卡 -->
+<div class="screen" id="screen-punch">
+<div class="card">
+<div class="punch-clock" id="p-clock">--:--:--</div>
+<div class="punch-date" id="p-date">──</div>
+<div class="gps-status" id="p-gps">📍 定位中...</div>
+<div id="p-result" class="punch-result"></div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+<button class="btn btn-green" onclick="appPunch('上班')">☀ 上班</button>
+<button class="btn btn-red" onclick="appPunch('下班')">🌙 下班</button>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+<button class="btn btn-yellow" onclick="appPunch('外出')">🚶 外出</button>
+<button class="btn btn-blue" onclick="appPunch('回公司')">🏢 回公司</button>
+</div>
+</div>
+<div class="card">
+<div class="card-title">📋 今日打卡紀錄</div>
+<div id="p-today">載入中...</div>
+</div>
+</div>
+
+<!-- 班表 -->
+<div class="screen" id="screen-sched">
+<div class="card">
+<div class="card-title">📅 我的班表</div>
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+<button class="btn btn-outline" style="width:auto;padding:8px 14px;font-size:13px" onclick="changeMonth(-1)">◀</button>
+<div style="flex:1;text-align:center;font-size:16px;font-weight:700" id="sched-month">──</div>
+<button class="btn btn-outline" style="width:auto;padding:8px 14px;font-size:13px" onclick="changeMonth(1)">▶</button>
+</div>
+<div id="sched-list">載入中...</div>
+</div>
+</div>
+
+<!-- 請假 -->
+<div class="screen" id="screen-leave">
+<div class="card">
+<div class="card-title">📝 請假申請</div>
+<div class="form-group"><span class="fl">假別</span><select class="fi" id="al-type"><option>事假</option><option>病假</option><option>特休</option><option>補休</option><option>婚假</option><option>喪假</option><option>產假</option><option>陪產假</option><option>公假</option></select></div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+<div class="form-group"><span class="fl">起始日期</span><input class="fi" type="date" id="al-start"></div>
+<div class="form-group"><span class="fl">結束日期</span><input class="fi" type="date" id="al-end"></div>
+</div>
+<div class="form-group"><span class="fl">請假單位</span><select class="fi" id="al-unit"><option value="天">整天</option><option value="半天">半天</option><option value="小時">小時</option></select></div>
+<div class="form-group"><span class="fl">事由</span><input class="fi" id="al-reason" placeholder="請輸入請假事由"></div>
+<button class="btn btn-blue" onclick="submitLeave()">送出假單</button>
+</div>
+<div class="card">
+<div class="card-title">📋 我的假單</div>
+<div id="leave-list">載入中...</div>
+</div>
+</div>
+
+<!-- 薪資 -->
+<div class="screen" id="screen-pay">
+<div class="card">
+<div class="card-title">💰 薪資明細</div>
+<div id="pay-list">載入中...</div>
+</div>
+</div>
+
+<!-- 個人 -->
+<div class="screen" id="screen-me">
+<div class="card">
+<div class="card-title">👤 個人資料</div>
+<div id="me-info">載入中...</div>
+</div>
+<button class="btn" style="background:var(--red);color:#fff;margin-top:14px" onclick="appLogout()">🚪 登出</button>
+</div>
+
+<!-- 底部 Tab -->
+<div class="tab-bar">
+<button class="tab-btn active" onclick="switchScreen('home')" id="tab-home"><span class="icon">🏠</span>首頁</button>
+<button class="tab-btn" onclick="switchScreen('punch')" id="tab-punch"><span class="icon">⏰</span>打卡</button>
+<button class="tab-btn" onclick="switchScreen('sched')" id="tab-sched"><span class="icon">📅</span>班表</button>
+<button class="tab-btn" onclick="switchScreen('leave')" id="tab-leave"><span class="icon">📝</span>請假</button>
+<button class="tab-btn" onclick="switchScreen('pay')" id="tab-pay"><span class="icon">💰</span>薪資</button>
+<button class="tab-btn" onclick="switchScreen('me')" id="tab-me"><span class="icon">👤</span>我的</button>
+</div>
+
+<script>
+var _DEFAULT_FB={apiKey:'AIzaSyCvZSX-WM6KRfxF3HxpROuq5zkStBIQzvY',projectId:'haomin-hr',authDomain:'haomin-hr.firebaseapp.com'};
+var db=null,curEmp=null,curAcct=null,staff=[],sched={},leaveRecords=[],payHistory={},punchRecords=[],storeHours={},fbEnv='prod';
+var viewY=new Date().getFullYear()-1911,viewM=new Date().getMonth()+1;
+function pad(n){return String(n).padStart(2,'0')}
+function fNT(v){return'NT$'+Math.round(v).toLocaleString()}
+function fT(h,m){return pad(h)+':'+pad(m)}
+var LEAVE=['例假','休假','國定假日','補休','特休','事假','病假'];
+var DOW=['日','一','二','三','四','五','六'];
+
+function saveAppFb(){var k=document.getElementById('app-fb-key').value.trim();var p=document.getElementById('app-fb-proj').value.trim();if(!k||!p){alert('請填入API Key和Project ID');return}localStorage.setItem('hm_app_fb',JSON.stringify({apiKey:k,projectId:p,authDomain:p+'.firebaseapp.com'}));alert('Firebase設定已儲存，請登入');initFb()}
+
+function initFb(){var cfg=null;try{cfg=JSON.parse(localStorage.getItem('hm_app_fb'))}catch(e){}if(!cfg)return false;try{var app;try{app=firebase.app()}catch(e){app=firebase.initializeApp(cfg)}db=firebase.firestore();return true}catch(e){return false}}
+
+function appLogin(){var u=document.getElementById('app-user').value.trim();var p=document.getElementById('app-pass').value;if(!u||!p){showErr('請輸入帳號和密碼');return}if(!db){var localAccts=JSON.parse(localStorage.getItem('hm_app_accounts')||'[]');var acct=localAccts.find(function(a){return a.user===u&&a.pass===p});if(acct){finishLogin(acct);return}showErr('請先設定Firebase連線');return}db.collection(fbEnv+'_hrdata').doc('accounts').get().then(function(doc){if(!doc.exists){showErr('無法取得帳號資料');return}var accounts=doc.data().userAccounts||[];var acct=accounts.find(function(a){return a.user===u&&a.pass===p});if(!acct){showErr('帳號或密碼錯誤');return}localStorage.setItem('hm_app_accounts',JSON.stringify(accounts));finishLogin(acct)}).catch(function(e){var localAccts=JSON.parse(localStorage.getItem('hm_app_accounts')||'[]');var acct=localAccts.find(function(a){return a.user===u&&a.pass===p});if(acct){document.getElementById('offline-bar').style.display='block';finishLogin(acct)}else{showErr('連線失敗：'+e.message)}})}
+
+function finishLogin(acct){curAcct=acct;if(document.getElementById('app-remember').checked){localStorage.setItem('hm_app_session',JSON.stringify({user:acct.user,pass:acct.pass}))}document.getElementById('login-screen').style.display='none';loadData()}
+
+function showErr(msg){var el=document.getElementById('app-err');el.textContent=msg;el.style.display='block'}
+function appLogout(){curAcct=null;curEmp=null;localStorage.removeItem('hm_app_session');document.getElementById('login-screen').style.display='flex';document.getElementById('app-user').value='';document.getElementById('app-pass').value='';document.getElementById('app-err').style.display='none'}
+
+function loadData(){if(!db){renderAll();return}db.collection(fbEnv+'_employees').get().then(function(s){var n=[];s.forEach(function(d){n.push(Object.assign({id:d.id},d.data()))});if(n.length)staff=n;findCurEmp();renderAll()}).catch(function(){findCurEmp();renderAll()});db.collection(fbEnv+'_schedules').doc((viewY+1911)+'-'+pad(viewM)).get().then(function(d){if(d.exists)sched=d.data().data||{}}).catch(function(){});db.collection(fbEnv+'_hrdata').doc('leave').get().then(function(d){if(d.exists&&d.data().leaveRecords)leaveRecords=d.data().leaveRecords}).catch(function(){});db.collection(fbEnv+'_hrdata').doc('payHistory').get().then(function(d){if(d.exists&&d.data().data)payHistory=d.data().data}).catch(function(){})}
+
+function findCurEmp(){if(curAcct&&curAcct.empId){curEmp=staff.find(function(e){return e.id===curAcct.empId})}if(!curEmp&&staff.length){curEmp=staff[0]}}
+
+function switchScreen(name){document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active')});document.querySelectorAll('.tab-btn').forEach(function(t){t.classList.remove('active')});document.getElementById('screen-'+name).classList.add('active');document.getElementById('tab-'+name).classList.add('active');if(name==='punch')initPunchScreen();if(name==='sched')renderSched();if(name==='leave')renderLeave();if(name==='pay')renderPay();if(name==='me')renderMe()}
+
+function renderAll(){if(!curEmp){document.getElementById('home-name').textContent='未綁定員工';return}document.getElementById('app-name').textContent=curEmp.name;document.getElementById('app-role').textContent=curEmp.role+' · '+(curEmp.store||'');document.getElementById('home-avatar').textContent=curEmp.name[0];document.getElementById('home-name').textContent=curEmp.name;document.getElementById('home-sub').textContent=curEmp.role+' · '+(curEmp.store||'')+' · 到職 '+(curEmp.hire_date||'─');document.getElementById('home-vac').textContent='─';document.getElementById('home-attend').textContent='─'}
+
+function initPunchScreen(){updateClock();if(window._pt)clearInterval(window._pt);window._pt=setInterval(updateClock,1000);getGPS();renderPunchToday()}
+
+function updateClock(){var n=new Date();document.getElementById('p-clock').textContent=pad(n.getHours())+':'+pad(n.getMinutes())+':'+pad(n.getSeconds());document.getElementById('p-date').textContent=n.getFullYear()+'/'+pad(n.getMonth()+1)+'/'+pad(n.getDate())+' ('+DOW[n.getDay()]+')';}
+
+var _lat=null,_lng=null;
+function getGPS(){var el=document.getElementById('p-gps');_lat=null;_lng=null;if(!navigator.geolocation){el.textContent='📍 不支援GPS';return}el.textContent='📍 定位中...';navigator.geolocation.getCurrentPosition(function(pos){_lat=pos.coords.latitude;_lng=pos.coords.longitude;var sh=curEmp?storeHours[curEmp.store]:null;if(sh&&sh.lat){var d=gpsDist(_lat,_lng,sh.lat,sh.lng);var ok=d<=(sh.radius||200);el.innerHTML='📍 '+(ok?'<span style="color:#166534">✅ 門市範圍內 ('+Math.round(d)+'m)</span>':'<span style="color:#991b1b">⚠ 不在門市範圍 ('+Math.round(d)+'m)</span>');el.style.background=ok?'#dcfce7':'#fee2e2'}else{el.textContent='📍 '+_lat.toFixed(5)+', '+_lng.toFixed(5)}},function(){el.textContent='📍 無法定位（仍可打卡）';el.style.color='#92400e'},{enableHighAccuracy:true,timeout:10000})}
+
+function gpsDist(a,b,c,d){var R=6371000,dL=(c-a)*Math.PI/180,dN=(d-b)*Math.PI/180,x=Math.sin(dL/2)*Math.sin(dL/2)+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dN/2)*Math.sin(dN/2);return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x))}
+
+function appPunch(type){if(!curEmp){alert('未綁定員工');return}if(curEmp.pin&&(type==='上班'||type==='下班')){var pin=prompt('請輸入4位PIN碼：');if(pin!==curEmp.pin){alert('PIN碼錯誤');return}}var now=new Date();var today=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());var time=pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds());var rec={id:'p'+Date.now(),eid:curEmp.id,name:curEmp.name,store:curEmp.store||'',date:today,time:time,type:type,gps:_lat?(_lat.toFixed(5)+','+_lng.toFixed(5)):'無定位',ts:now.toISOString()};var local=JSON.parse(localStorage.getItem('hm_app_punch')||'[]');local.push(rec);localStorage.setItem('hm_app_punch',JSON.stringify(local));if(db){db.collection(fbEnv+'_punch').add(rec).catch(function(){})}var res=document.getElementById('p-result');res.style.display='block';var tc=type==='上班'?'#166534':type==='下班'?'#991b1b':type==='外出'?'#92400e':'#0369a1';var bg=type==='上班'?'#dcfce7':type==='下班'?'#fee2e2':type==='外出'?'#fef3c7':'#e0f2fe';res.style.background=bg;res.style.color=tc;res.innerHTML='<div style="font-size:28px;margin-bottom:4px">'+(type==='上班'?'☀':type==='下班'?'🌙':type==='外出'?'🚶':'🏢')+'</div><div style="font-size:20px;font-weight:700">'+type+'打卡成功</div><div style="font-size:24px;font-weight:700;font-family:JetBrains Mono,monospace;margin-top:4px">'+time+'</div>';renderPunchToday()}
+
+function renderPunchToday(){var now=new Date();var today=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());var local=JSON.parse(localStorage.getItem('hm_app_punch')||'[]');var recs=local.filter(function(r){return r.eid===(curEmp?curEmp.id:'')&&r.date===today}).sort(function(a,b){return a.time>b.time?1:-1});var h='';if(!recs.length)h='<div style="text-align:center;padding:16px;color:var(--gray4)">今日尚無打卡紀錄</div>';recs.forEach(function(r){var tc=r.type==='上班'?'#166534':r.type==='下班'?'#991b1b':r.type==='外出'?'#92400e':'#0369a1';var bg=r.type==='上班'?'#dcfce7':r.type==='下班'?'#fee2e2':r.type==='外出'?'#fef3c7':'#e0f2fe';h+='<div class="punch-row"><span style="background:'+bg+';color:'+tc+';padding:3px 10px;border-radius:8px;font-weight:700;font-size:12px;min-width:50px;text-align:center">'+r.type+'</span><span style="font-family:JetBrains Mono,monospace;font-weight:700;font-size:16px;margin-left:auto">'+r.time+'</span></div>'});document.getElementById('p-today').innerHTML=h}
+
+function changeMonth(d){viewM+=d;if(viewM>12){viewM=1;viewY++}if(viewM<1){viewM=12;viewY--}renderSched()}
+
+function renderSched(){document.getElementById('sched-month').textContent='民國'+viewY+'年'+viewM+'月';if(!curEmp){document.getElementById('sched-list').innerHTML='<div style="text-align:center;padding:20px;color:var(--gray4)">未綁定員工</div>';return}var D=new Date(viewY+1911,viewM,0).getDate();var h='';for(var d=1;d<=D;d++){var dt=new Date(viewY+1911,viewM-1,d);var dw=dt.getDay();var key=(viewY+1911)+'-'+pad(viewM)+'-'+pad(d);var sc=sched[curEmp.id]?sched[curEmp.id][key]:null;var isWknd=dw===0||dw===6;var dayColor=isWknd?'#991b1b':'var(--gray6)';h+='<div class="sched-day" style="'+(isWknd?'background:#fff5f5;border-radius:8px;padding:10px;margin:-2px -4px':'')+'"><span class="day" style="color:'+dayColor+'">'+viewM+'/'+d+'<br><span style="font-size:11px;color:var(--gray4)">('+DOW[dw]+')</span></span>';if(sc&&LEAVE.indexOf(sc.type)>=0){var lc=sc.type==='例假'?'#166534':sc.type==='特休'?'#0e7490':sc.type==='事假'?'#991b1b':'#6d28d9';h+='<span class="leave" style="color:'+lc+'">'+sc.type+'</span>'}else if(sc){h+='<span class="time">'+fT(sc.sh,sc.sm)+' - '+fT(sc.eh,sc.em)+'</span>'}else if(dw===0){h+='<span class="leave" style="color:#166534">例假</span>'}else if(curEmp){h+='<span class="time">'+fT(curEmp.sh||9,curEmp.sm||0)+' - '+fT(curEmp.eh||17,curEmp.em||0)+'</span>'}h+='</div>'}document.getElementById('sched-list').innerHTML=h}
+
+function submitLeave(){if(!curEmp){alert('未綁定員工');return}var type=document.getElementById('al-type').value;var start=document.getElementById('al-start').value;var end=document.getElementById('al-end').value;var reason=document.getElementById('al-reason').value;var unit=document.getElementById('al-unit').value;if(!start||!end){alert('請選擇日期');return}if(!reason){alert('請填寫事由');return}var days=unit==='半天'?0.5:Math.max(1,Math.round((new Date(end)-new Date(start))/(24*60*60*1000))+1);var rec={id:'lv'+Date.now(),eid:curEmp.id,type:type,start:start,end:end,days:days,reason:reason,status:'待簽核',month:(viewY+1911)+'-'+pad(viewM),unit:unit,agent:'',agentName:'',created:new Date().toISOString()};if(db){db.collection(fbEnv+'_hrdata').doc('leave').get().then(function(doc){var data=doc.exists?doc.data():{leaveRecords:[]};data.leaveRecords.push(rec);db.collection(fbEnv+'_hrdata').doc('leave').set(data);alert('✅ 假單已送出\n'+type+' '+days+'天\n等待主管簽核');document.getElementById('al-reason').value='';renderLeave()}).catch(function(e){alert('送出失敗：'+e.message)})}else{var local=JSON.parse(localStorage.getItem('hm_app_leave')||'[]');local.push(rec);localStorage.setItem('hm_app_leave',JSON.stringify(local));alert('✅ 假單已暫存（離線模式）');renderLeave()}}
+
+function renderLeave(){if(!curEmp){return}var myLeaves=leaveRecords.filter(function(r){return r.eid===curEmp.id}).reverse().slice(0,10);var local=JSON.parse(localStorage.getItem('hm_app_leave')||'[]').filter(function(r){return r.eid===curEmp.id}).reverse();var all=local.concat(myLeaves);var h='';if(!all.length)h='<div style="text-align:center;padding:16px;color:var(--gray4)">無假單紀錄</div>';all.forEach(function(r){var sc=r.status==='已核准'?'background:#dcfce7;color:#166534':r.status==='已駁回'?'background:#fee2e2;color:#991b1b':r.status==='店長核准'?'background:#dbeafe;color:#1e40af':'background:#fef3c7;color:#92400e';h+='<div class="list-item"><div style="flex:1"><div style="font-weight:700">'+r.type+' <span style="font-size:12px;color:var(--gray4)">'+r.days+'天</span></div><div style="font-size:12px;color:var(--gray4)">'+r.start+' ~ '+r.end+'</div><div style="font-size:12px;color:var(--gray4)">'+(r.reason||'')+'</div></div><span class="badge" style="'+sc+'">'+r.status+'</span></div>'});document.getElementById('leave-list').innerHTML=h}
+
+function renderPay(){if(!curEmp){return}var months=Object.keys(payHistory).sort().reverse();var h='';if(!months.length)h='<div style="text-align:center;padding:20px;color:var(--gray4)">尚無薪資紀錄<br><span style="font-size:12px">薪資由管理端每月存檔後顯示</span></div>';months.forEach(function(mk){var rec=payHistory[mk][curEmp.id];if(!rec)return;h+='<div class="list-item"><div style="flex:1"><div style="font-weight:700;font-size:14px">'+mk+'</div><div style="font-size:12px;color:var(--gray4)">出勤 '+rec.workDays+'天</div></div><div style="text-align:right"><div style="font-family:JetBrains Mono,monospace;font-weight:700;font-size:16px;color:#166534">'+fNT(rec.netPay)+'</div><div style="font-size:11px;color:var(--gray4)">應發 '+fNT(rec.gross)+'</div></div></div>'});document.getElementById('pay-list').innerHTML=h}
+
+function renderMe(){if(!curEmp)return;var e=curEmp;var h='';var fields=[['姓名',e.name],['職稱',e.role],['門市',e.store],['到職日',e.hire_date],['電話',e.phone],['Email',e.email],['地址',e.address]];fields.forEach(function(f){h+='<div style="display:flex;padding:10px 0;border-bottom:1px solid var(--gray1)"><span style="min-width:70px;font-size:13px;color:var(--gray4)">'+f[0]+'</span><span style="font-size:14px;font-weight:600">'+(f[1]||'─')+'</span></div>'});document.getElementById('me-info').innerHTML=h}
+
+// Init
+if(!localStorage.getItem('hm_app_fb')){localStorage.setItem('hm_app_fb',JSON.stringify(_DEFAULT_FB))}initFb();
+try{var fb=JSON.parse(localStorage.getItem('hm_app_fb'));if(fb){document.getElementById('app-fb-key').value=fb.apiKey||'';document.getElementById('app-fb-proj').value=fb.projectId||''}}catch(e){}
+try{var sess=JSON.parse(localStorage.getItem('hm_app_session'));if(sess){document.getElementById('app-user').value=sess.user;document.getElementById('app-pass').value=sess.pass;appLogin()}}catch(e){}
+</script>
+</body>
+</html>
