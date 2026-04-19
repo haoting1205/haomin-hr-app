@@ -70,7 +70,7 @@ body{font-family:'Noto Sans TC',sans-serif;background:#eef2f7;color:var(--gray6)
 <input type="checkbox" id="app-remember" style="width:16px;height:16px"><label for="app-remember" style="font-size:13px;color:var(--gray4)">記住我</label>
 </div>
 <button class="btn btn-blue" onclick="appLogin()">登入</button>
-<div id="app-err" style="margin-top:10px;color:var(--red);font-size:13px;display:none"></div>
+<div style="margin-top:12px;padding:10px 14px;background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.15);border-radius:8px;font-size:11px;color:#2563eb;line-height:1.7;text-align:left">💡 首次登入提示<br>帳號：您的員工工號（9碼數字）<br>預設密碼：工號 + aa（如 115041401aa）<br>登入後請至「👤 我的」修改密碼</div><div id="app-err" style="margin-top:10px;color:var(--red);font-size:13px;display:none"></div>
 <button onclick="showAppForgot()" style="margin-top:12px;background:none;border:none;color:#2563eb;font-size:13px;cursor:pointer;font-family:inherit;text-decoration:underline">忘記密碼？</button>
 <div id="app-forgot" style="display:none;margin-top:14px;text-align:left;background:var(--gray1);border-radius:10px;padding:16px">
 <div style="font-size:14px;font-weight:700;color:#0f1b35;margin-bottom:8px">🔑 密碼重設</div>
@@ -176,12 +176,129 @@ body{font-family:'Noto Sans TC',sans-serif;background:#eef2f7;color:var(--gray6)
 </div>
 
 <!-- 個人 -->
+<div class="screen" id="screen-sop">
+<div style="padding:16px;font-size:12px;line-height:1.8;color:#333">
+<div style="font-size:18px;font-weight:700;color:#0f1b35;margin-bottom:4px">📖 員工操作手冊</div>
+<div style="font-size:11px;color:#888;margin-bottom:16px">好洺餐飲事業有限公司 員工APP操作SOP</div>
+
+<div style="background:#0f1b35;color:#f0c96a;padding:8px 12px;border-radius:6px;font-weight:700;font-size:13px;margin-bottom:6px">一、首次登入</div>
+<div style="padding:4px 8px 12px">
+<b>Step 1</b>　輸入帳號（您的員工工號，9碼數字）<br>
+<b>Step 2</b>　輸入預設密碼：工號 + aa（如 115041401aa）<br>
+<b>Step 3</b>　勾選「☑ 記住我」，下次自動登入<br>
+<b>Step 4</b>　系統會提醒修改密碼，請立即修改<br>
+<b>密碼規則</b>：8~16字元，必須含英文和數字
+</div>
+
+<div style="background:#166534;color:#fff;padding:8px 12px;border-radius:6px;font-weight:700;font-size:13px;margin-bottom:6px">二、每日打卡</div>
+<div style="padding:4px 8px 12px">
+<b>上班打卡</b><br>
+• 點「⏰ 打卡」→ 選擇門市 → 按「☀ 上班」<br>
+• 系統自動 GPS 定位驗證（需在門市範圍內）<br>
+• 輸入 4 位 PIN 碼確認身份<br>
+• 打卡後會顯示今日注意事項<br>
+• 台積電店：請確認已放置手機/3C 產品<br><br>
+<b>下班打卡</b><br>
+• 按「🌙 下班」→ GPS + PIN 驗證<br>
+• 系統自動跳出安全確認清單：<br>
+　✓ 水、電、瓦斯是否關閉<br>
+　✓ 冰箱溫度是否填寫<br>
+　✓ 門、窗、保全是否上鎖<br><br>
+<b>外出/回公司</b><br>
+• 外出辦事按「🚶 外出」，回來按「🏢 回公司」
+</div>
+
+<div style="background:#1e40af;color:#fff;padding:8px 12px;border-radius:6px;font-weight:700;font-size:13px;margin-bottom:6px">三、查看班表</div>
+<div style="padding:4px 8px 12px">
+• 點「📅 班表」查看個人當月排班<br>
+• 顯示每日上下班時間、休假日<br>
+• 國定假日、例假以不同顏色標示
+</div>
+
+<div style="background:#7c3aed;color:#fff;padding:8px 12px;border-radius:6px;font-weight:700;font-size:13px;margin-bottom:6px">四、劃休申請</div>
+<div style="padding:4px 8px 12px">
+<b>Step 1</b>　每月 <b style="color:#dc2626">10日前</b> 點「🗓 劃休」<br>
+<b>Step 2</b>　在日曆上點選下個月想休假的日期<br>
+<b>Step 3</b>　最多選擇 <b>4天</b><br>
+<b>Step 4</b>　按「📤 提交劃休申請」<br>
+<b>Step 5</b>　等待店長審核（已核准/已拒絕）<br>
+<b>注意</b>　超過10日系統自動關閉劃休功能<br>
+<b>被拒絕</b>　可按「重新申請」重新選擇日期
+</div>
+
+<div style="background:#92400e;color:#fff;padding:8px 12px;border-radius:6px;font-weight:700;font-size:13px;margin-bottom:6px">五、請假申請</div>
+<div style="padding:4px 8px 12px">
+• 點「📝 請假」→ 選假別/日期/天數 → 提交<br>
+• 等待主管簽核<br><br>
+<b>假別說明：</b><br>
+• 事假：全年≤14日，不給薪<br>
+• 病假：全年≤30日，半薪，10日內不扣考績<br>
+• 家庭照顧假：全年7日，可按小時請，不扣全勤<br>
+• 特休：依年資（6月=3天/1年=7天/2年=10天...）<br>
+• 補休：加班後申請，有到期日<br>
+• 生理假：每月1日，不扣全勤
+</div>
+
+<div style="background:#0369a1;color:#fff;padding:8px 12px;border-radius:6px;font-weight:700;font-size:13px;margin-bottom:6px">六、查看薪資</div>
+<div style="padding:4px 8px 12px">
+• 點「💰 薪資」查看每月薪資明細<br>
+• 顯示：本薪+津貼+加班費-勞保-健保-所得稅=實發<br>
+• 發薪日：每月10日（遇假日提前）
+</div>
+
+<div style="background:#dc2626;color:#fff;padding:8px 12px;border-radius:6px;font-weight:700;font-size:13px;margin-bottom:6px">七、修改密碼 / 忘記密碼</div>
+<div style="padding:4px 8px 12px">
+<b>修改密碼</b><br>
+• 👤 我的 → 🔐 修改密碼<br>
+• 輸入舊密碼 → 新密碼 → 確認新密碼<br>
+• 規則：8~16字元，英文+數字<br><br>
+<b>忘記密碼</b><br>
+• 登入畫面 → 「忘記密碼？」<br>
+• 輸入帳號（工號）+ 身分證字號驗證<br>
+• 系統重設密碼為：工號+aa<br>
+• 重設後請立即修改密碼
+</div>
+
+<div style="background:#444;color:#fff;padding:8px 12px;border-radius:6px;font-weight:700;font-size:13px;margin-bottom:6px">八、補休及特休換薪</div>
+<div style="padding:4px 8px 12px">
+<b>特休換薪</b><br>
+• 年度終結或離職時，未休完的特休可折算工資<br>
+• 計算方式：日薪 × 未休天數<br>
+• 系統自動計算，含在離職結算薪資中<br><br>
+<b>補休換薪</b><br>
+• 補休有到期日（依勞基法規定）<br>
+• 到期未休完 → 自動轉為加班費發放<br>
+• 加班費標準：前2h×1.33 / 第3h起×1.67
+</div>
+
+<div style="background:var(--gray1);padding:10px 12px;border-radius:6px;font-size:11px;color:#666;line-height:1.7;margin-top:8px">
+<b>💡 小提示</b><br>
+• 打卡需在門市 GPS 範圍內（200~300m）<br>
+• 遲到當月累計超過30分鐘扣全勤<br>
+• 連續曠職3天視為自動離職<br>
+• 工作滿4小時可申請員工餐（100元/餐，上限200元/天）<br>
+• 新人報到需提供半年內體檢報告<br>
+• 有問題請聯繫店長或人資部門
+</div>
+</div>
+</div>
+<div class="screen" id="screen-preleave">
+<div style="padding:16px">
+<div style="font-size:18px;font-weight:700;color:#0f1b35;margin-bottom:4px">🗓 劃休申請</div>
+<div style="font-size:12px;color:#666;margin-bottom:16px">每月10日前提交下月休假，最多4天</div>
+<div id="preleave-status"></div>
+<div id="preleave-calendar" style="margin-top:12px"></div>
+<div id="preleave-selected" style="margin-top:12px"></div>
+<div id="preleave-actions" style="margin-top:12px"></div>
+</div>
+</div>
 <div class="screen" id="screen-me">
 <div class="card">
 <div class="card-title">👤 個人資料</div>
 <div id="me-info">載入中...</div>
 </div>
 <button class="btn btn-blue" style="margin-top:14px" onclick="appChangePass()">🔐 修改密碼</button>
+<button class="btn btn-outline" style="margin-top:8px" onclick="switchScreen('sop')">📖 操作手冊</button>
 <button class="btn" style="background:var(--red);color:#fff;margin-top:8px" onclick="appLogout()">🚪 登出</button>
 </div>
 
@@ -192,11 +309,12 @@ body{font-family:'Noto Sans TC',sans-serif;background:#eef2f7;color:var(--gray6)
 <button class="tab-btn" onclick="switchScreen('sched')" id="tab-sched"><span class="icon">📅</span>班表</button>
 <button class="tab-btn" onclick="switchScreen('leave')" id="tab-leave"><span class="icon">📝</span>請假</button>
 <button class="tab-btn" onclick="switchScreen('pay')" id="tab-pay"><span class="icon">💰</span>薪資</button>
+<button class="tab-btn" onclick="switchScreen('preleave')" id="tab-preleave"><span class="icon">🗓</span>劃休</button>
 <button class="tab-btn" onclick="switchScreen('me')" id="tab-me"><span class="icon">👤</span>我的</button>
 </div>
 
 <script>
-var _DEFAULT_FB={apiKey:'AIzaSyCvZSX-WM6KRfxF3HxpROuq5zkStBIQzvY',projectId:'haomin-hr',authDomain:'haomin-hr.firebaseapp.com'};
+var _DEFAULT_FB={apiKey:'AIzaSyAk8D1oXTYaq9E1t96bPW-1rMu0EhW1JzQ',projectId:'haomin-system',authDomain:'haomin-system.firebaseapp.com'};
 var db=null,curEmp=null,curAcct=null,staff=[],sched={},leaveRecords=[],payHistory={},punchRecords=[],storeHours={},fbEnv='prod';
 var viewY=new Date().getFullYear()-1911,viewM=new Date().getMonth()+1;
 function pad(n){return String(n).padStart(2,'0')}
@@ -220,7 +338,7 @@ function loadData(){if(!db){renderAll();return}db.collection(fbEnv+'_employees')
 
 function findCurEmp(){if(curAcct&&curAcct.empId){curEmp=staff.find(function(e){return e.id===curAcct.empId})}if(!curEmp&&staff.length){curEmp=staff[0]}}
 
-function switchScreen(name){document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active')});document.querySelectorAll('.tab-btn').forEach(function(t){t.classList.remove('active')});document.getElementById('screen-'+name).classList.add('active');document.getElementById('tab-'+name).classList.add('active');if(name==='punch')initPunchScreen();if(name==='sched')renderSched();if(name==='leave')renderLeave();if(name==='pay')renderPay();if(name==='me')renderMe()}
+function switchScreen(name){document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active')});document.querySelectorAll('.tab-btn').forEach(function(t){t.classList.remove('active')});document.getElementById('screen-'+name).classList.add('active');document.getElementById('tab-'+name).classList.add('active');if(name==='punch')initPunchScreen();if(name==='sched')renderSched();if(name==='leave')renderLeave();if(name==='pay')renderPay();if(name==='me')renderMe();if(name==='preleave')renderPreLeave();if(name==='sop'){}}
 
 function renderAll(){if(!curEmp){document.getElementById('home-name').textContent='未綁定員工';return}document.getElementById('app-name').textContent=curEmp.name;document.getElementById('app-role').textContent=curEmp.role+' · '+(curEmp.store||'');document.getElementById('home-avatar').textContent=curEmp.name[0];document.getElementById('home-name').textContent=curEmp.name;document.getElementById('home-sub').textContent=curEmp.role+' · '+(curEmp.store||'')+' · 到職 '+(curEmp.hire_date||'─');document.getElementById('home-vac').textContent='─';document.getElementById('home-attend').textContent='─'}
 
@@ -253,6 +371,23 @@ function showAppForgot(){document.getElementById('app-forgot').style.display='bl
 function hideAppForgot(){document.getElementById('app-forgot').style.display='none';document.getElementById('forgot-user').value='';document.getElementById('forgot-id').value=''}
 function doAppForgot(){var user=document.getElementById('forgot-user').value.trim().toLowerCase();var idNum=document.getElementById('forgot-id').value.trim();if(!user||!idNum){alert('請填寫帳號和身分證字號');return}if(!db){alert('無法連線，請稍後再試');return}db.collection(fbEnv+'_hrdata').doc('accounts').get().then(function(doc){if(!doc.exists){alert('系統錯誤');return}var data=doc.data();var accounts=data.userAccounts||[];var acct=accounts.find(function(a){return a.user.toLowerCase()===user});if(!acct){alert('查無此帳號');return}if(!acct.empId){alert('此帳號未綁定員工，請聯繫管理員');return}db.collection(fbEnv+'_employees').get().then(function(s){var emp=null;s.forEach(function(d2){var e=Object.assign({id:d2.id},d2.data());if(e.id===acct.empId)emp=e});if(!emp){alert('查無員工資料，請聯繫管理員');return}if(emp.id_num!==idNum){alert('身分證字號驗證失敗');return}var newPass=user+'aa';acct.pass=newPass;db.collection(fbEnv+'_hrdata').doc('accounts').set({userAccounts:accounts}).then(function(){alert('✅ 密碼已重設\n\n帳號：'+user+'\n新密碼：'+newPass+'\n\n請登入後立即修改密碼');hideAppForgot()}).catch(function(e){alert('重設失敗：'+e.message)})}).catch(function(e){alert('驗證失敗：'+e.message)})}).catch(function(e){alert('連線失敗：'+e.message)})}
 function appChangePass(){if(!curAcct){alert('請先登入');return}var oldP=prompt('請輸入目前密碼：');if(!oldP)return;if(oldP!==curAcct.pass){alert('密碼錯誤');return}var newP=prompt('請輸入新密碼（8~16字元，英文+數字）：');if(!newP)return;if(newP.length<8||newP.length>16){alert('密碼長度需8~16字元');return}if(!/[a-zA-Z]/.test(newP)||!/[0-9]/.test(newP)){alert('密碼需同時包含英文和數字');return}var confirmP=prompt('請再次輸入新密碼確認：');if(confirmP!==newP){alert('兩次輸入不一致');return}if(db){db.collection(fbEnv+'_hrdata').doc('accounts').get().then(function(doc){if(!doc.exists)return;var data=doc.data();var accounts=data.userAccounts||[];var acct=accounts.find(function(a){return a.user===curAcct.user});if(acct){acct.pass=newP;db.collection(fbEnv+'_hrdata').doc('accounts').set({userAccounts:accounts});curAcct.pass=newP;if(document.getElementById('app-remember').checked){localStorage.setItem('hm_app_session',JSON.stringify({user:curAcct.user,pass:newP}))}alert('✅ 密碼已修改成功')}}).catch(function(e){alert('修改失敗：'+e.message)})}else{alert('請連線後再修改密碼')}}
+
+var preLeaveSelected=[];
+function renderPreLeave(){if(!curAcct)return;var now=new Date();var nextM=now.getMonth()+2;var nextY=now.getFullYear();if(nextM>12){nextM=1;nextY++}var mk=nextY+'-'+String(nextM).padStart(2,'0');var isOpen=now.getDate()<=10;var statusEl=document.getElementById('preleave-status');var calEl=document.getElementById('preleave-calendar');var selEl=document.getElementById('preleave-selected');var actEl=document.getElementById('preleave-actions');
+var existing=null;if(db){db.collection(fbEnv+'_hrdata').doc('preLeave').get().then(function(doc){var data=doc.exists?doc.data().data||[]:[];existing=data.find(function(p){return p.eid===curEmp.id&&p.month===mk});renderPreLeaveUI(nextY,nextM,mk,isOpen,existing,statusEl,calEl,selEl,actEl)}).catch(function(){renderPreLeaveUI(nextY,nextM,mk,isOpen,null,statusEl,calEl,selEl,actEl)})}else{renderPreLeaveUI(nextY,nextM,mk,isOpen,null,statusEl,calEl,selEl,actEl)}}
+function renderPreLeaveUI(yr,mon,mk,isOpen,existing,statusEl,calEl,selEl,actEl){if(existing){var stColor=existing.status==='已核准'?'#166534':existing.status==='已拒絕'?'#991b1b':'#92400e';var stBg=existing.status==='已核准'?'#dcfce7':existing.status==='已拒絕'?'#fee2e2':'#fef3c7';statusEl.innerHTML='<div style="padding:12px;background:'+stBg+';border-radius:10px;margin-bottom:8px"><div style="font-size:14px;font-weight:700;color:'+stColor+'">'+existing.status+'</div><div style="font-size:12px;color:#666;margin-top:4px">休假日：'+existing.dates.join(', ')+'</div>'+(existing.rejectReason?'<div style="font-size:12px;color:#991b1b;margin-top:4px">原因：'+existing.rejectReason+'</div>':'')+'</div>';calEl.innerHTML='';selEl.innerHTML='';actEl.innerHTML=existing.status==='已拒絕'?'<button class="btn btn-blue" onclick="resetPreLeave()">重新申請</button>':'';return}
+if(!isOpen){statusEl.innerHTML='<div style="padding:16px;background:#fee2e2;border-radius:10px;text-align:center"><div style="font-size:14px;font-weight:700;color:#991b1b">已超過截止日</div><div style="font-size:12px;color:#666;margin-top:4px">劃休截止日為每月10日，請下月再申請</div></div>';calEl.innerHTML='';selEl.innerHTML='';actEl.innerHTML='';return}
+statusEl.innerHTML='<div style="padding:10px;background:#dbeafe;border-radius:10px;font-size:12px;color:#1e40af;font-weight:700">請選擇 '+yr+'年'+mon+'月 想休假的日期（最多4天）</div>';
+var daysInMonth=new Date(yr,mon,0).getDate();var firstDay=new Date(yr,mon-1,1).getDay();var cal='<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center">';['日','一','二','三','四','五','六'].forEach(function(d){cal+='<div style="font-size:11px;font-weight:700;color:#666;padding:6px 0">'+d+'</div>'});for(var i=0;i<firstDay;i++)cal+='<div></div>';for(var d=1;d<=daysInMonth;d++){var dateStr=yr+'-'+String(mon).padStart(2,'0')+'-'+String(d).padStart(2,'0');var dow=new Date(yr,mon-1,d).getDay();var isSel=preLeaveSelected.indexOf(dateStr)>=0;var bg=isSel?'#2563eb':'#f8fafc';var clr=isSel?'#fff':dow===0||dow===6?'#dc2626':'#222';cal+='<div onclick="togglePreLeaveDate(this,\''+dateStr+'\')" style="padding:8px 4px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:700;background:'+bg+';color:'+clr+';border:2px solid '+(isSel?'#1d4ed8':'transparent')+'">'+d+'</div>'}cal+='</div>';calEl.innerHTML=cal;
+updatePreLeaveSelected(selEl,actEl)}
+function togglePreLeaveDate(el,dateStr){var idx=preLeaveSelected.indexOf(dateStr);if(idx>=0){preLeaveSelected.splice(idx,1)}else{if(preLeaveSelected.length>=4){alert('最多選擇4天');return}preLeaveSelected.push(dateStr)}renderPreLeave()}
+function updatePreLeaveSelected(selEl,actEl){if(preLeaveSelected.length>0){selEl.innerHTML='<div style="font-size:13px;font-weight:700;color:#0f1b35;margin-bottom:6px">已選擇 '+preLeaveSelected.length+'/4 天</div><div style="display:flex;flex-wrap:wrap;gap:4px">'+preLeaveSelected.sort().map(function(d){return'<span style="padding:4px 10px;background:#dbeafe;border-radius:6px;font-size:12px;font-weight:700;color:#1e40af">'+d.substring(5)+'</span>'}).join('')+'</div>';actEl.innerHTML='<button class="btn btn-blue" onclick="submitPreLeave()" style="width:100%;margin-top:8px;padding:12px;font-size:15px">📤 提交劃休申請</button>'}else{selEl.innerHTML='';actEl.innerHTML=''}}
+function submitPreLeave(){if(preLeaveSelected.length===0){alert('請先選擇休假日期');return}if(!curEmp||!db){alert('請先登入並連線');return}var now=new Date();var nextM=now.getMonth()+2;var nextY=now.getFullYear();if(nextM>12){nextM=1;nextY++}var mk=nextY+'-'+String(nextM).padStart(2,'0');var newPL={id:'pl'+Date.now(),eid:curEmp.id,name:curEmp.name,store:curEmp.store||'',month:mk,dates:preLeaveSelected.sort(),status:'待審核',submitDate:now.toISOString()};db.collection(fbEnv+'_hrdata').doc('preLeave').get().then(function(doc){var data=doc.exists?doc.data().data||[]:[];data.push(newPL);db.collection(fbEnv+'_hrdata').doc('preLeave').set({data:data}).then(function(){preLeaveSelected=[];alert('✅ 劃休申請已提交\n\n'+mk+' 休假：'+newPL.dates.join(', ')+'\n\n請等待店長審核');renderPreLeave()}).catch(function(e){alert('提交失敗：'+e.message)})}).catch(function(e){alert('連線失敗：'+e.message)})}
+function resetPreLeave(){if(!curEmp||!db)return;var now=new Date();var nextM=now.getMonth()+2;var nextY=now.getFullYear();if(nextM>12){nextM=1;nextY++}var mk=nextY+'-'+String(nextM).padStart(2,'0');db.collection(fbEnv+'_hrdata').doc('preLeave').get().then(function(doc){var data=doc.exists?doc.data().data||[]:[];data=data.filter(function(p){return!(p.eid===curEmp.id&&p.month===mk)});db.collection(fbEnv+'_hrdata').doc('preLeave').set({data:data}).then(function(){preLeaveSelected=[];renderPreLeave()}).catch(function(e){alert('失敗：'+e.message)})})}
+
+
+function checkPreLeaveReminder(){if(!curEmp||!db)return;var now=new Date();if(now.getDate()>10)return;var nextM=now.getMonth()+2;var nextY=now.getFullYear();if(nextM>12){nextM=1;nextY++}var mk=nextY+'-'+String(nextM).padStart(2,'0');db.collection(fbEnv+'_hrdata').doc('preLeave').get().then(function(doc){var data=doc.exists?doc.data().data||[]:[];var mine=data.find(function(p){return p.eid===curEmp.id&&p.month===mk});if(!mine){var daysLeft=10-now.getDate();var el=document.getElementById('preleave-remind');if(el)el.innerHTML='<div onclick="switchScreen(\'preleave\')" style="padding:14px;background:linear-gradient(135deg,#fef3c7,#fffbeb);border:2px solid #f59e0b;border-radius:12px;margin-bottom:14px;cursor:pointer"><div style="font-size:14px;font-weight:700;color:#92400e">🗓 劃休提醒</div><div style="font-size:12px;color:#92400e;margin-top:4px">'+mk+' 尚未提交劃休申請</div><div style="font-size:12px;color:#b45309;margin-top:2px">截止日剩 <b>'+daysLeft+'</b> 天，請盡快提交 →</div></div>'}}).catch(function(){})}
+
 // Init
 if(!localStorage.getItem('hm_app_fb')){localStorage.setItem('hm_app_fb',JSON.stringify(_DEFAULT_FB))}initFb();
 try{var fb=JSON.parse(localStorage.getItem('hm_app_fb'));if(fb){document.getElementById('app-fb-key').value=fb.apiKey||'';document.getElementById('app-fb-proj').value=fb.projectId||''}}catch(e){}
