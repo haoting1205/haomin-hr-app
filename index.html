@@ -314,7 +314,7 @@ body{font-family:'Noto Sans TC',sans-serif;background:#eef2f7;color:var(--gray6)
 </div>
 
 <script>
-var _DEFAULT_FB={apiKey:'AIzaSyAk8D1oXTYaq9E1t96bPW-1rMu0EhW1JzQ',projectId:'haomin-system',authDomain:'haomin-system.firebaseapp.com'};
+var _DEFAULT_FB={apiKey:'AIzaSyAk8D1oXTYaq9E1t96bPW-1rMu0EhW1JzQ',projectId:'haomin-system',authDomain:'haomin-system.firebaseapp.com',storageBucket:'haomin-system.firebasestorage.app',appId:'1:348193196599:web:a454b20e4145041e39cdb2'};
 var db=null,curEmp=null,curAcct=null,staff=[],sched={},leaveRecords=[],payHistory={},punchRecords=[],storeHours={},fbEnv='prod';
 var viewY=new Date().getFullYear()-1911,viewM=new Date().getMonth()+1;
 function pad(n){return String(n).padStart(2,'0')}
@@ -388,10 +388,13 @@ function resetPreLeave(){if(!curEmp||!db)return;var now=new Date();var nextM=now
 
 function checkPreLeaveReminder(){if(!curEmp||!db)return;var now=new Date();if(now.getDate()>10)return;var nextM=now.getMonth()+2;var nextY=now.getFullYear();if(nextM>12){nextM=1;nextY++}var mk=nextY+'-'+String(nextM).padStart(2,'0');db.collection(fbEnv+'_hrdata').doc('preLeave').get().then(function(doc){var data=doc.exists?doc.data().data||[]:[];var mine=data.find(function(p){return p.eid===curEmp.id&&p.month===mk});if(!mine){var daysLeft=10-now.getDate();var el=document.getElementById('preleave-remind');if(el)el.innerHTML='<div onclick="switchScreen(\'preleave\')" style="padding:14px;background:linear-gradient(135deg,#fef3c7,#fffbeb);border:2px solid #f59e0b;border-radius:12px;margin-bottom:14px;cursor:pointer"><div style="font-size:14px;font-weight:700;color:#92400e">🗓 劃休提醒</div><div style="font-size:12px;color:#92400e;margin-top:4px">'+mk+' 尚未提交劃休申請</div><div style="font-size:12px;color:#b45309;margin-top:2px">截止日剩 <b>'+daysLeft+'</b> 天，請盡快提交 →</div></div>'}}).catch(function(){})}
 
+
+function appAutoLogin(sess){if(!db){appLogin();return}db.collection(fbEnv+'_hrdata').doc('accounts').get().then(function(doc){if(!doc.exists){appLogin();return}var accounts=doc.data().userAccounts||[];var acct=accounts.find(function(a){return a.user===sess.user&&a.pass===sess.pass});if(acct){finishLogin(acct)}else{localStorage.removeItem('hm_app_session');document.getElementById('app-pass').value='';showErr('密碼已被管理端修改，請重新登入')}}).catch(function(){appLogin()})}
+
 // Init
-if(!localStorage.getItem('hm_app_fb')){localStorage.setItem('hm_app_fb',JSON.stringify(_DEFAULT_FB))}initFb();
+localStorage.setItem('hm_app_fb',JSON.stringify(_DEFAULT_FB));initFb();
 try{var fb=JSON.parse(localStorage.getItem('hm_app_fb'));if(fb){document.getElementById('app-fb-key').value=fb.apiKey||'';document.getElementById('app-fb-proj').value=fb.projectId||''}}catch(e){}
-try{var sess=JSON.parse(localStorage.getItem('hm_app_session'));if(sess){document.getElementById('app-user').value=sess.user;document.getElementById('app-pass').value=sess.pass;appLogin()}}catch(e){}
+try{var sess=JSON.parse(localStorage.getItem('hm_app_session'));if(sess){document.getElementById('app-user').value=sess.user;document.getElementById('app-pass').value=sess.pass;appAutoLogin(sess)}}catch(e){}
 </script>
 </body>
 </html>
