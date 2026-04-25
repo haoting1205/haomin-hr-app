@@ -259,7 +259,16 @@ body{font-family:'Noto Sans TC',sans-serif;background:#eef2f7;color:var(--gray6)
 • 重設後請立即修改密碼
 </div>
 
-<div style="background:#444;color:#fff;padding:8px 12px;border-radius:6px;font-weight:700;font-size:13px;margin-bottom:6px">八、補休及特休換薪</div>
+<div style="background:#b45309;color:#fff;padding:8px 12px;border-radius:6px;font-weight:700;font-size:13px;margin-bottom:6px">八、加班核准後選擇</div>
+<div style="padding:4px 8px 12px">
+<b>加班核准後</b>，APP首頁會出現選擇卡片：<br>
+• 💰 <b>領加班費</b> → 計入當月薪資（前2h×1.33/第3h起×1.67）<br>
+• 🗓 <b>換補休</b> → 產生補休時數，6個月內有效<br>
+• 到期未休完 → 自動轉為加班費<br>
+• <b>選擇後不可更改</b>，請謹慎選擇
+</div>
+
+<div style="background:#444;color:#fff;padding:8px 12px;border-radius:6px;font-weight:700;font-size:13px;margin-bottom:6px">九、補休及特休換薪</div>
 <div style="padding:4px 8px 12px">
 <b>特休換薪</b><br>
 • 年度終結或離職時，未休完的特休可折算工資<br>
@@ -329,7 +338,7 @@ function initFb(){var cfg=null;try{cfg=JSON.parse(localStorage.getItem('hm_app_f
 
 function appLogin(){var u=document.getElementById('app-user').value.trim();var p=document.getElementById('app-pass').value;if(!u||!p){showErr('請輸入帳號和密碼');return}if(!db){var localAccts=JSON.parse(localStorage.getItem('hm_app_accounts')||'[]');var acct=localAccts.find(function(a){return a.user===u&&a.pass===p});if(acct){finishLogin(acct);return}showErr('請先設定Firebase連線');return}db.collection(fbEnv+'_hrdata').doc('accounts').get().then(function(doc){if(!doc.exists){showErr('無法取得帳號資料');return}var accounts=doc.data().userAccounts||[];var acct=accounts.find(function(a){return a.user===u&&a.pass===p});if(!acct){showErr('帳號或密碼錯誤');return}localStorage.setItem('hm_app_accounts',JSON.stringify(accounts));finishLogin(acct)}).catch(function(e){var localAccts=JSON.parse(localStorage.getItem('hm_app_accounts')||'[]');var acct=localAccts.find(function(a){return a.user===u&&a.pass===p});if(acct){document.getElementById('offline-bar').style.display='block';finishLogin(acct)}else{showErr('連線失敗：'+e.message)}})}
 
-function finishLogin(acct){curAcct=acct;if(document.getElementById('app-remember').checked){localStorage.setItem('hm_app_session',JSON.stringify({user:acct.user,pass:acct.pass}))}document.getElementById('login-screen').style.display='none';loadData()}
+function finishLogin(acct){curAcct=acct;if(document.getElementById('app-remember').checked){localStorage.setItem('hm_app_session',JSON.stringify({user:acct.user,pass:acct.pass}))}document.getElementById('login-screen').style.display='none';loadData();if(acct.pass===acct.user+'aa'){setTimeout(function(){if(confirm('⚠ 您目前使用預設密碼\n\n為保護帳號安全，建議立即修改密碼。\n\n按「確定」立即修改\n按「取消」稍後再改')){appChangePass()}},2000)}}
 
 function showErr(msg){var el=document.getElementById('app-err');el.textContent=msg;el.style.display='block'}
 function appLogout(){curAcct=null;curEmp=null;localStorage.removeItem('hm_app_session');document.getElementById('login-screen').style.display='flex';document.getElementById('app-user').value='';document.getElementById('app-pass').value='';document.getElementById('app-err').style.display='none'}
@@ -390,6 +399,10 @@ function checkPreLeaveReminder(){if(!curEmp||!db)return;var now=new Date();if(no
 
 
 function appAutoLogin(sess){if(!db){appLogin();return}db.collection(fbEnv+'_hrdata').doc('accounts').get().then(function(doc){if(!doc.exists){appLogin();return}var accounts=doc.data().userAccounts||[];var acct=accounts.find(function(a){return a.user===sess.user&&a.pass===sess.pass});if(acct){finishLogin(acct)}else{localStorage.removeItem('hm_app_session');document.getElementById('app-pass').value='';showErr('密碼已被管理端修改，請重新登入')}}).catch(function(){appLogin()})}
+
+
+function renderOTChoices(){if(!curEmp||!db)return;db.collection(fbEnv+'_hrdata').doc('otRecords').get().then(function(doc){var data=doc.exists?doc.data().data||[]:[];var myOT=data.filter(function(r){return r.eid===curEmp.id&&r.status==='已核准'&&!r.payType});var el=document.getElementById('ot-choice-area');if(!el)return;if(myOT.length===0){el.innerHTML='';return}var h='';myOT.forEach(function(r){h+='<div style="padding:14px;background:linear-gradient(135deg,#dcfce7,#f0fdf4);border:2px solid #16a34a;border-radius:12px;margin-bottom:10px"><div style="font-size:14px;font-weight:700;color:#166534;margin-bottom:6px">✅ 加班已核准</div><div style="font-size:12px;color:#333;margin-bottom:8px">日期：'+r.date+' ｜ 時數：'+r.hours+'小時</div><div style="display:flex;gap:8px"><button onclick="appOTChoose(\''+r.id+'\',\'pay\')" style="flex:1;padding:12px;background:#0369a1;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">💰 領加班費</button><button onclick="appOTChoose(\''+r.id+'\',\'comp\')" style="flex:1;padding:12px;background:#7c3aed;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">🗓 換補休</button></div></div>'});el.innerHTML=h}).catch(function(){})}
+function appOTChoose(otId,choice){if(!db)return;var label=choice==='pay'?'💰 領加班費':'🗓 換補休（6個月內有效）';if(!confirm('確定選擇「'+label+'」？\n\n'+(choice==='pay'?'加班費將計入當月薪資。':'補休時數將記錄在系統中，6個月內需使用完畢。\n到期未休完將自動轉為加班費。')))return;db.collection(fbEnv+'_hrdata').doc('otRecords').get().then(function(doc){var data=doc.exists?doc.data().data||[]:[];var r=data.find(function(x){return x.id===otId});if(!r){alert('找不到此紀錄');return}if(choice==='pay'){r.payType='加班費'}else{var expiry=new Date(r.date);expiry.setMonth(expiry.getMonth()+6);r.payType='補休';r.compHours=r.hours;r.compUsed=0;r.compExpiry=expiry.toISOString().substring(0,10)}r.choiceDate=new Date().toISOString();r.choiceBy='employee';db.collection(fbEnv+'_hrdata').doc('otRecords').set({data:data}).then(function(){alert('✅ 已選擇：'+label);renderOTChoices()}).catch(function(e){alert('失敗：'+e.message)})}).catch(function(e){alert('連線失敗：'+e.message)})}
 
 // Init
 localStorage.setItem('hm_app_fb',JSON.stringify(_DEFAULT_FB));initFb();
