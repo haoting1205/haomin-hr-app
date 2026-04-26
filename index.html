@@ -196,6 +196,7 @@ body{font-family:'Noto Sans TC',sans-serif;background:#eef2f7;color:var(--gray6)
 </div>
 
 <div style="background:#166534;color:#fff;padding:8px 12px;border-radius:6px;font-weight:700;font-size:13px;margin-bottom:6px">二、每日打卡</div>
+<div style="padding:4px 8px 4px"><b>【離線打卡】</b><br>網路不穩時仍可正常打卡，紀錄暫存手機<br>恢復網路後自動上傳（畫面顯示「📡 X筆待同步」）</div>
 <div style="padding:4px 8px 4px"><b>【補打卡申請】</b><br>忘記打卡時 → ⏰打卡頁下方「📋 補打卡申請」<br>填寫日期/時間/類型/原因 → 📤提交 → 等待店長審核<br>審核結果可在「近期申請」查看</div>
 <div style="padding:4px 8px 4px"><b>【交接事項】</b><br>上班時🏠首頁會顯示店長留的今日交接事項（黃色卡片）</div>
 <div style="padding:4px 8px 12px">
@@ -335,6 +336,9 @@ body{font-family:'Noto Sans TC',sans-serif;background:#eef2f7;color:var(--gray6)
 </div>
 
 <script>
+
+window.onerror=function(msg,url,line,col,err){var entry={ts:new Date().toISOString(),msg:msg,line:line,col:col,src:'employee-app'};try{var log=JSON.parse(localStorage.getItem('hm_app_errors')||'[]');log.push(entry);if(log.length>30)log.shift();localStorage.setItem('hm_app_errors',JSON.stringify(log));if(db)db.collection(fbEnv+'_hrdata').doc('errorLog').get().then(function(doc){var data=doc.exists?doc.data().data||[]:[];data.push(entry);if(data.length>100)data=data.slice(-100);db.collection(fbEnv+'_hrdata').doc('errorLog').set({data:data}).catch(function(){})})}catch(e){}return false};
+
 var _DEFAULT_FB={apiKey:'AIzaSyAk8D1oXTYaq9E1t96bPW-1rMu0EhW1JzQ',projectId:'haomin-system',authDomain:'haomin-system.firebaseapp.com',storageBucket:'haomin-system.firebasestorage.app',appId:'1:348193196599:web:a454b20e4145041e39cdb2'};
 var db=null,curEmp=null,curAcct=null,staff=[],sched={},leaveRecords=[],payHistory={},punchRecords=[],storeHours={},fbEnv='prod';
 var viewY=new Date().getFullYear()-1911,viewM=new Date().getMonth()+1;
@@ -372,7 +376,7 @@ function getGPS(){var el=document.getElementById('p-gps');_lat=null;_lng=null;if
 
 function gpsDist(a,b,c,d){var R=6371000,dL=(c-a)*Math.PI/180,dN=(d-b)*Math.PI/180,x=Math.sin(dL/2)*Math.sin(dL/2)+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dN/2)*Math.sin(dN/2);return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x))}
 
-function appPunch(type){if(!curEmp){alert('未綁定員工');return}if(curEmp.pin&&(type==='上班'||type==='下班')){var pin=prompt('請輸入4位PIN碼：');if(pin!==curEmp.pin){alert('PIN碼錯誤');return}}var now=new Date();var today=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());var time=pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds());var rec={id:'p'+Date.now(),eid:curEmp.id,name:curEmp.name,store:curEmp.store||'',date:today,time:time,type:type,gps:_lat?(_lat.toFixed(5)+','+_lng.toFixed(5)):'無定位',ts:now.toISOString()};var local=JSON.parse(localStorage.getItem('hm_app_punch')||'[]');local.push(rec);localStorage.setItem('hm_app_punch',JSON.stringify(local));if(db){db.collection(fbEnv+'_hrdata').doc('punchRecords').get().then(function(doc){var data=doc.exists?doc.data().data||[]:[];data.push(rec);db.collection(fbEnv+'_hrdata').doc('punchRecords').set({data:data}).catch(function(){})}).catch(function(){})}var res=document.getElementById('p-result');res.style.display='block';var tc=type==='上班'?'#166534':type==='下班'?'#991b1b':type==='外出'?'#92400e':'#0369a1';var bg=type==='上班'?'#dcfce7':type==='下班'?'#fee2e2':type==='外出'?'#fef3c7':'#e0f2fe';res.style.background=bg;res.style.color=tc;res.innerHTML='<div style="font-size:28px;margin-bottom:4px">'+(type==='上班'?'☀':type==='下班'?'🌙':type==='外出'?'🚶':'🏢')+'</div><div style="font-size:20px;font-weight:700">'+type+'打卡成功</div><div style="font-size:24px;font-weight:700;font-family:JetBrains Mono,monospace;margin-top:4px">'+time+'</div>';renderPunchToday()}
+function appPunch(type){if(!curEmp){alert('未綁定員工');return}if(curEmp.pin&&(type==='上班'||type==='下班')){var pin=prompt('請輸入4位PIN碼：');if(pin!==curEmp.pin){alert('PIN碼錯誤');return}}var now=new Date();var today=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());var time=pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds());var rec={id:'p'+Date.now(),eid:curEmp.id,name:curEmp.name,store:curEmp.store||'',date:today,time:time,type:type,gps:_lat?(_lat.toFixed(5)+','+_lng.toFixed(5)):'無定位',ts:now.toISOString()};var local=JSON.parse(localStorage.getItem('hm_app_punch')||'[]');local.push(rec);localStorage.setItem('hm_app_punch',JSON.stringify(local));if(db&&navigator.onLine){db.collection(fbEnv+'_hrdata').doc('punchRecords').get().then(function(doc){var data=doc.exists?doc.data().data||[]:[];data.push(rec);db.collection(fbEnv+'_hrdata').doc('punchRecords').set({data:data}).catch(function(e){saveOfflinePunch(rec)})}).catch(function(){saveOfflinePunch(rec)})}else{saveOfflinePunch(rec)}var res=document.getElementById('p-result');res.style.display='block';var tc=type==='上班'?'#166534':type==='下班'?'#991b1b':type==='外出'?'#92400e':'#0369a1';var bg=type==='上班'?'#dcfce7':type==='下班'?'#fee2e2':type==='外出'?'#fef3c7':'#e0f2fe';res.style.background=bg;res.style.color=tc;res.innerHTML='<div style="font-size:28px;margin-bottom:4px">'+(type==='上班'?'☀':type==='下班'?'🌙':type==='外出'?'🚶':'🏢')+'</div><div style="font-size:20px;font-weight:700">'+type+'打卡成功</div><div style="font-size:24px;font-weight:700;font-family:JetBrains Mono,monospace;margin-top:4px">'+time+'</div>';renderPunchToday()}
 
 function renderPunchToday(){var now=new Date();var today=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());var local=JSON.parse(localStorage.getItem('hm_app_punch')||'[]');var recs=local.filter(function(r){return r.eid===(curEmp?curEmp.id:'')&&r.date===today}).sort(function(a,b){return a.time>b.time?1:-1});var h='';if(!recs.length)h='<div style="text-align:center;padding:16px;color:var(--gray4)">今日尚無打卡紀錄</div>';recs.forEach(function(r){var tc=r.type==='上班'?'#166534':r.type==='下班'?'#991b1b':r.type==='外出'?'#92400e':'#0369a1';var bg=r.type==='上班'?'#dcfce7':r.type==='下班'?'#fee2e2':r.type==='外出'?'#fef3c7':'#e0f2fe';h+='<div class="punch-row"><span style="background:'+bg+';color:'+tc+';padding:3px 10px;border-radius:8px;font-weight:700;font-size:12px;min-width:50px;text-align:center">'+r.type+'</span><span style="font-family:JetBrains Mono,monospace;font-weight:700;font-size:16px;margin-left:auto">'+r.time+'</span></div>'});document.getElementById('p-today').innerHTML=h}
 
@@ -440,6 +444,19 @@ function syncPunchFromFB(){if(!curEmp||!db)return;db.collection(fbEnv+'_hrdata')
 
 function hashPass(plain){if(!plain)return'';var h=0;for(var i=0;i<plain.length;i++){var ch=plain.charCodeAt(i);h=((h<<5)-h)+ch;h=h&h}return'hm$'+Math.abs(h).toString(36)+'$'+plain.length}
 function verifyPass(plain,hashed){if(!hashed||hashed.indexOf('hm$')!==0)return plain===hashed;return hashPass(plain)===hashed}
+
+
+var offlinePunchQueue=[];
+try{offlinePunchQueue=JSON.parse(localStorage.getItem('hm_offline_punch')||'[]')}catch(e){}
+
+function saveOfflinePunch(rec){offlinePunchQueue.push(rec);localStorage.setItem('hm_offline_punch',JSON.stringify(offlinePunchQueue));showOfflineStatus()}
+
+function syncOfflinePunches(){if(!db||offlinePunchQueue.length===0)return;var queue=offlinePunchQueue.slice();db.collection(fbEnv+'_hrdata').doc('punchRecords').get().then(function(doc){var data=doc.exists?doc.data().data||[]:[];var synced=0;queue.forEach(function(rec){if(!data.find(function(d){return d.id===rec.id})){data.push(rec);synced++}});if(synced>0){db.collection(fbEnv+'_hrdata').doc('punchRecords').set({data:data}).then(function(){offlinePunchQueue=[];localStorage.removeItem('hm_offline_punch');showOfflineStatus();console.log('Synced '+synced+' offline punches')}).catch(function(){})}else{offlinePunchQueue=[];localStorage.removeItem('hm_offline_punch')}}).catch(function(){})}
+
+function showOfflineStatus(){var el=document.getElementById('offline-badge');if(!el)return;if(offlinePunchQueue.length>0){el.style.display='block';el.textContent='📡 '+offlinePunchQueue.length+'筆待同步'}else{el.style.display='none'}}
+
+window.addEventListener('online',function(){console.log('Network restored');setTimeout(syncOfflinePunches,2000)});
+setInterval(function(){if(navigator.onLine&&offlinePunchQueue.length>0)syncOfflinePunches()},60000);
 
 // Init
 localStorage.setItem('hm_app_fb',JSON.stringify(_DEFAULT_FB));initFb();
