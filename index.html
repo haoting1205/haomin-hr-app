@@ -65,7 +65,7 @@ body{font-family:'Noto Sans TC',sans-serif;background:#eef2f7;color:var(--gray6)
 <h1>好洺餐飲事業有限公司</h1>
 <div class="sub">員工APP</div>
 <div class="form-group"><input class="fi" id="app-user" placeholder="帳號"></div>
-<div class="form-group"><input class="fi" id="app-pass" type="password" placeholder="密碼" onkeydown="if(event.key==='Enter')appLogin()"></div>
+<div class="form-group" style="position:relative"><input class="fi" id="app-pass" type="password" placeholder="密碼" onkeydown="if(event.key==='Enter')appLogin()" style="padding-right:44px"><button type="button" onclick="togglePassVis()" id="pass-toggle" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;font-size:18px;cursor:pointer;color:#8892b0;padding:4px">👁</button></div>
 <div class="form-group" style="display:flex;align-items:center;gap:6px;justify-content:flex-start">
 <input type="checkbox" id="app-remember" style="width:16px;height:16px"><label for="app-remember" style="font-size:13px;color:var(--gray4)">記住我</label>
 </div>
@@ -354,7 +354,7 @@ function initFb(){try{if(firebase.auth)firebase.auth().signInAnonymously().catch
 
 function appLogin(){var u=document.getElementById('app-user').value.trim();var p=document.getElementById('app-pass').value;if(!u||!p){showErr('請輸入帳號和密碼');return}if(!db){var localAccts=JSON.parse(localStorage.getItem('hm_app_accounts')||'[]');var acct=localAccts.find(function(a){return a.user===u&&verifyPass(p,a.pass)});if(acct){finishLogin(acct);return}showErr('請先設定Firebase連線');return}db.collection(fbEnv+'_hrdata').doc('accounts').get().then(function(doc){if(!doc.exists){showErr('無法取得帳號資料');return}var accounts=doc.data().userAccounts||[];var acct=accounts.find(function(a){return a.user===u&&verifyPass(p,a.pass)});if(!acct){showErr('帳號或密碼錯誤');return}localStorage.setItem('hm_app_accounts',JSON.stringify(accounts));acct._plain=p;finishLogin(acct)}).catch(function(e){var localAccts=JSON.parse(localStorage.getItem('hm_app_accounts')||'[]');var acct=localAccts.find(function(a){return a.user===u&&verifyPass(p,a.pass)});if(acct){document.getElementById('offline-bar').style.display='block';finishLogin(acct)}else{showErr('連線失敗：'+e.message)}})}
 
-function finishLogin(acct){curAcct=acct;if(document.getElementById('app-remember').checked){localStorage.setItem('hm_app_session',JSON.stringify({user:acct.user,pass:acct._plain||acct.pass}))}document.getElementById('login-screen').style.display='none';loadData();setTimeout(loadStoreNotes,2500);if(verifyPass(acct.user+'aa',acct.pass)){setTimeout(function(){if(confirm('⚠ 您目前使用預設密碼\n\n為保護帳號安全，建議立即修改密碼。\n\n按「確定」立即修改\n按「取消」稍後再改')){appChangePass()}},2000)}}
+function finishLogin(acct){curAcct=acct;if(document.getElementById('app-remember').checked){localStorage.setItem('hm_app_session',JSON.stringify({user:acct.user,pass:acct._plain||acct.pass}))}document.getElementById('login-screen').style.display='none';loadData();setTimeout(loadStoreNotes,2500);setTimeout(loadEmpStats,1500);if(verifyPass(acct.user+'aa',acct.pass)){setTimeout(function(){if(confirm('⚠ 您目前使用預設密碼\n\n為保護帳號安全，建議立即修改密碼。\n\n按「確定」立即修改\n按「取消」稍後再改')){appChangePass()}},2000)}}
 
 function showErr(msg){var el=document.getElementById('app-err');el.textContent=msg;el.style.display='block'}
 function appLogout(){curAcct=null;curEmp=null;localStorage.removeItem('hm_app_session');document.getElementById('login-screen').style.display='flex';document.getElementById('app-user').value='';document.getElementById('app-pass').value='';document.getElementById('app-err').style.display='none'}
@@ -363,7 +363,7 @@ function loadData(){if(!db){renderAll();return}db.collection(fbEnv+'_employees')
 
 function findCurEmp(){if(curAcct&&curAcct.empId){curEmp=staff.find(function(e){return e.id===curAcct.empId})}if(!curEmp&&staff.length){curEmp=staff[0]}}
 
-function switchScreen(name){document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active')});document.querySelectorAll('.tab-btn').forEach(function(t){t.classList.remove('active')});document.getElementById('screen-'+name).classList.add('active');document.getElementById('tab-'+name).classList.add('active');if(name==='punch')initPunchScreen();if(name==='sched')renderSched();if(name==='leave')renderLeave();if(name==='pay')renderPay();if(name==='me')renderMe();if(name==='preleave')renderPreLeave();if(name==='swap')openAppSwap();if(name==='sop'){}}
+function switchScreen(name){document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active')});document.querySelectorAll('.tab-btn').forEach(function(t){t.classList.remove('active')});document.getElementById('screen-'+name).classList.add('active');document.getElementById('tab-'+name).classList.add('active');if(name==='home'&&typeof loadEmpStats==='function')loadEmpStats();if(name==='punch')initPunchScreen();if(name==='sched')renderSched();if(name==='leave')renderLeave();if(name==='pay')renderPay();if(name==='me')renderMe();if(name==='preleave')renderPreLeave();if(name==='swap')openAppSwap();if(name==='sop'){}}
 
 function renderAll(){if(!curEmp){document.getElementById('home-name').textContent='未綁定員工';return}document.getElementById('app-name').textContent=curEmp.name;document.getElementById('app-role').textContent=curEmp.role+' · '+(curEmp.store||'');document.getElementById('home-avatar').textContent=curEmp.name[0];document.getElementById('home-name').textContent=curEmp.name;document.getElementById('home-sub').textContent=curEmp.role+' · '+(curEmp.store||'')+' · 到職 '+(curEmp.hire_date||'─');document.getElementById('home-vac').textContent='─';document.getElementById('home-attend').textContent='─'}
 
@@ -457,6 +457,28 @@ function showOfflineStatus(){var el=document.getElementById('offline-badge');if(
 
 window.addEventListener('online',function(){console.log('Network restored');setTimeout(syncOfflinePunches,2000)});
 setInterval(function(){if(navigator.onLine&&offlinePunchQueue.length>0)syncOfflinePunches()},60000);
+
+
+var empStats=null;
+function loadEmpStats(){
+  if(!curEmp||!db)return;
+  db.collection(fbEnv+'_hrdata').doc('empStats').get().then(function(doc){
+    if(!doc.exists)return;
+    var data=doc.data().data||{};
+    empStats=data[curEmp.id]||null;
+    renderEmpStats();
+  }).catch(function(){});
+}
+function renderEmpStats(){
+  if(!empStats)return;
+  var vacEl=document.getElementById('home-vac');
+  var attEl=document.getElementById('home-attend');
+  if(vacEl)vacEl.textContent=empStats.vacLeft!==undefined?empStats.vacLeft:'─';
+  if(attEl)attEl.textContent=empStats.attendDays!==undefined?empStats.attendDays:'─';
+}
+
+
+function togglePassVis(){var inp=document.getElementById('app-pass');var btn=document.getElementById('pass-toggle');if(inp.type==='password'){inp.type='text';btn.textContent='🙈'}else{inp.type='password';btn.textContent='👁'}}
 
 // Init
 localStorage.setItem('hm_app_fb',JSON.stringify(_DEFAULT_FB));initFb();
