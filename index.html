@@ -281,7 +281,10 @@ body{font-family:'Noto Sans TC',sans-serif;background:#eef2f7;color:var(--gray6)
 <div style="background:#8b5cf6;color:#fff;padding:8px 12px;border-radius:6px;font-weight:700;font-size:13px;margin-bottom:6px">九、員工滿意度調查</div>
 <div style="padding:4px 8px 12px">老闆發起調查後，🏠首頁會出現紫色問卷卡片<br>5個項目各評1~5分 → 📤匿名提交<br>調查結果老闆可查看，不會顯示是誰填的</div>
 
-<div style="background:#444;color:#fff;padding:8px 12px;border-radius:6px;font-weight:700;font-size:13px;margin-bottom:6px">十、補休及特休換薪</div>
+<div style="background:#0f1b35;color:#f0c96a;padding:8px 12px;border-radius:6px;font-weight:700;font-size:13px;margin-bottom:6px">十、老闆/店長行動管理</div>
+<div style="padding:4px 8px 12px">老闆或店長帳號登入後，底部多出3個分頁：<br><b>📋 審核</b>　假單/加班/換班/劃休/補打卡，一鍵核准或駁回<br><b>📊 出勤</b>　今日打卡狀況+未打卡名單+歷史查詢<br><b>📈 報表</b>　在職人數/平均出勤/特休餘額/遲到統計<br>不在電腦前也能即時處理</div>
+
+<div style="background:#444;color:#fff;padding:8px 12px;border-radius:6px;font-weight:700;font-size:13px;margin-bottom:6px">十一、補休及特休換薪</div>
 <div style="padding:4px 8px 12px">
 <b>特休換薪</b><br>
 • 年度終結或離職時，未休完的特休可折算工資<br>
@@ -324,6 +327,44 @@ body{font-family:'Noto Sans TC',sans-serif;background:#eef2f7;color:var(--gray6)
 <button class="btn" style="background:var(--red);color:#fff;margin-top:8px" onclick="appLogout()">🚪 登出</button>
 </div>
 
+
+<!-- 管理：審核 -->
+<div class="screen" id="screen-approve">
+<div class="card">
+<div class="card-title">📋 待審核事項</div>
+<div id="mgr-approve-list">載入中...</div>
+</div>
+</div>
+
+<!-- 管理：出勤 -->
+<div class="screen" id="screen-attend">
+<div class="card">
+<div class="card-title">📊 今日出勤</div>
+<div id="mgr-attend-today">載入中...</div>
+</div>
+<div class="card">
+<div class="card-title">🔍 打卡查詢</div>
+<div style="display:flex;gap:8px;margin-bottom:10px">
+<select class="fi" id="mgr-att-emp" style="flex:1"></select>
+<input class="fi" type="date" id="mgr-att-date" style="width:140px">
+</div>
+<button class="btn btn-blue" onclick="mgrSearchPunch()" style="padding:10px;font-size:13px">🔍 查詢</button>
+<div id="mgr-punch-result" style="margin-top:10px"></div>
+</div>
+</div>
+
+<!-- 管理：報表 -->
+<div class="screen" id="screen-report">
+<div class="card">
+<div class="card-title">📊 本月營運摘要</div>
+<div id="mgr-report-summary">載入中...</div>
+</div>
+<div class="card">
+<div class="card-title">👥 人力概況</div>
+<div id="mgr-report-staff">載入中...</div>
+</div>
+</div>
+
 <!-- 底部 Tab -->
 <div class="tab-bar">
 <button class="tab-btn active" onclick="switchScreen('home')" id="tab-home"><span class="icon">🏠</span>首頁</button>
@@ -332,7 +373,7 @@ body{font-family:'Noto Sans TC',sans-serif;background:#eef2f7;color:var(--gray6)
 <button class="tab-btn" onclick="switchScreen('leave')" id="tab-leave"><span class="icon">📝</span>請假</button>
 <button class="tab-btn" onclick="switchScreen('pay')" id="tab-pay"><span class="icon">💰</span>薪資</button>
 <button class="tab-btn" onclick="switchScreen('preleave')" id="tab-preleave"><span class="icon">🗓</span>劃休</button>
-<button class="tab-btn" onclick="switchScreen('me')" id="tab-me"><span class="icon">👤</span>我的</button>
+<button class="tab-btn" onclick="switchScreen('me')" id="tab-me"><span class="icon">👤</span>我的</button><button class="tab-btn mgr-tab" onclick="switchScreen('approve')" id="tab-approve" style="display:none"><span class="icon">📋</span>審核</button><button class="tab-btn mgr-tab" onclick="switchScreen('attend')" id="tab-attend" style="display:none"><span class="icon">📊</span>出勤</button><button class="tab-btn mgr-tab" onclick="switchScreen('report')" id="tab-report" style="display:none"><span class="icon">📈</span>報表</button>
 </div>
 
 <script>
@@ -354,7 +395,7 @@ function initFb(){try{if(firebase.auth)firebase.auth().signInAnonymously().catch
 
 function appLogin(){var u=document.getElementById('app-user').value.trim();var p=document.getElementById('app-pass').value;if(!u||!p){showErr('請輸入帳號和密碼');return}if(!db){var localAccts=JSON.parse(localStorage.getItem('hm_app_accounts')||'[]');var acct=localAccts.find(function(a){return a.user===u&&verifyPass(p,a.pass)});if(acct){finishLogin(acct);return}showErr('請先設定Firebase連線');return}db.collection(fbEnv+'_hrdata').doc('accounts').get().then(function(doc){if(!doc.exists){showErr('無法取得帳號資料');return}var accounts=doc.data().userAccounts||[];var acct=accounts.find(function(a){return a.user===u&&verifyPass(p,a.pass)});if(!acct){showErr('帳號或密碼錯誤');return}localStorage.setItem('hm_app_accounts',JSON.stringify(accounts));acct._plain=p;finishLogin(acct)}).catch(function(e){var localAccts=JSON.parse(localStorage.getItem('hm_app_accounts')||'[]');var acct=localAccts.find(function(a){return a.user===u&&verifyPass(p,a.pass)});if(acct){document.getElementById('offline-bar').style.display='block';finishLogin(acct)}else{showErr('連線失敗：'+e.message)}})}
 
-function finishLogin(acct){curAcct=acct;if(document.getElementById('app-remember').checked){localStorage.setItem('hm_app_session',JSON.stringify({user:acct.user,pass:acct._plain||acct.pass}))}document.getElementById('login-screen').style.display='none';loadData();setTimeout(loadStoreNotes,2500);setTimeout(loadEmpStats,1500);if(verifyPass(acct.user+'aa',acct.pass)){setTimeout(function(){if(confirm('⚠ 您目前使用預設密碼\n\n為保護帳號安全，建議立即修改密碼。\n\n按「確定」立即修改\n按「取消」稍後再改')){appChangePass()}},2000)}}
+function finishLogin(acct){curAcct=acct;if(document.getElementById('app-remember').checked){localStorage.setItem('hm_app_session',JSON.stringify({user:acct.user,pass:acct._plain||acct.pass}))}document.getElementById('login-screen').style.display='none';loadData();setTimeout(loadStoreNotes,2500);setTimeout(loadEmpStats,1500);setTimeout(checkMgrRole,500);if(verifyPass(acct.user+'aa',acct.pass)){setTimeout(function(){if(confirm('⚠ 您目前使用預設密碼\n\n為保護帳號安全，建議立即修改密碼。\n\n按「確定」立即修改\n按「取消」稍後再改')){appChangePass()}},2000)}}
 
 function showErr(msg){var el=document.getElementById('app-err');el.textContent=msg;el.style.display='block'}
 function appLogout(){curAcct=null;curEmp=null;localStorage.removeItem('hm_app_session');document.getElementById('login-screen').style.display='flex';document.getElementById('app-user').value='';document.getElementById('app-pass').value='';document.getElementById('app-err').style.display='none'}
@@ -363,7 +404,7 @@ function loadData(){if(!db){renderAll();return}db.collection(fbEnv+'_employees')
 
 function findCurEmp(){if(curAcct&&curAcct.empId){curEmp=staff.find(function(e){return e.id===curAcct.empId})}if(!curEmp&&staff.length){curEmp=staff[0]}}
 
-function switchScreen(name){document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active')});document.querySelectorAll('.tab-btn').forEach(function(t){t.classList.remove('active')});document.getElementById('screen-'+name).classList.add('active');document.getElementById('tab-'+name).classList.add('active');if(name==='home'&&typeof loadEmpStats==='function')loadEmpStats();if(name==='punch')initPunchScreen();if(name==='sched')renderSched();if(name==='leave')renderLeave();if(name==='pay')renderPay();if(name==='me')renderMe();if(name==='preleave')renderPreLeave();if(name==='swap')openAppSwap();if(name==='sop'){}}
+function switchScreen(name){document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active')});document.querySelectorAll('.tab-btn').forEach(function(t){t.classList.remove('active')});document.getElementById('screen-'+name).classList.add('active');document.getElementById('tab-'+name).classList.add('active');if(name==='home'&&typeof loadEmpStats==='function')loadEmpStats();if(name==='approve')loadMgrApprove();if(name==='attend')loadMgrAttend();if(name==='report')loadMgrReport();if(name==='punch')initPunchScreen();if(name==='sched')renderSched();if(name==='leave')renderLeave();if(name==='pay')renderPay();if(name==='me')renderMe();if(name==='preleave')renderPreLeave();if(name==='swap')openAppSwap();if(name==='sop'){}}
 
 function renderAll(){if(!curEmp){document.getElementById('home-name').textContent='未綁定員工';return}document.getElementById('app-name').textContent=curEmp.name;document.getElementById('app-role').textContent=curEmp.role+' · '+(curEmp.store||'');document.getElementById('home-avatar').textContent=curEmp.name[0];document.getElementById('home-name').textContent=curEmp.name;document.getElementById('home-sub').textContent=curEmp.role+' · '+(curEmp.store||'')+' · 到職 '+(curEmp.hire_date||'─');document.getElementById('home-vac').textContent='─';document.getElementById('home-attend').textContent='─'}
 
@@ -479,6 +520,189 @@ function renderEmpStats(){
 
 
 function togglePassVis(){var inp=document.getElementById('app-pass');var btn=document.getElementById('pass-toggle');if(inp.type==='password'){inp.type='text';btn.textContent='🙈'}else{inp.type='password';btn.textContent='👁'}}
+
+
+
+// ===== MOBILE MANAGEMENT =====
+var mgrRole=null;
+function checkMgrRole(){
+  if(!curAcct)return;
+  mgrRole=curAcct.role;
+  var tabs=document.querySelectorAll('.mgr-tab');
+  var show=mgrRole==='老闆'||mgrRole==='店長';
+  tabs.forEach(function(t){t.style.display=show?'':'none'});
+}
+
+function loadMgrApprove(){
+  if(!db||!mgrRole)return;
+  var h='';
+  
+  // Leave requests
+  db.collection(fbEnv+'_hrdata').doc('leave').get().then(function(doc){
+    var leaves=(doc.exists?doc.data().leaveRecords||[]:[]).filter(function(r){return r.status==='待簽核'||r.status==='店長核准'});
+    if(leaves.length>0){
+      h+='<div style="font-size:13px;font-weight:700;color:#1e40af;margin-bottom:6px">📝 假單 ('+leaves.length+')</div>';
+      leaves.forEach(function(r){
+        var emp=staff.find(function(x){return x.id===r.eid})||{};
+        h+='<div style="padding:10px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;margin-bottom:6px"><div style="font-weight:700;font-size:14px">'+r.type+' '+(emp.name||r.eid)+'</div><div style="font-size:12px;color:#666">'+r.start+' ~ '+r.end+' ('+r.days+'天)</div><div style="font-size:12px;color:#666">'+(r.reason||'')+'</div><div style="display:flex;gap:6px;margin-top:6px"><button onclick="mgrApproveLeave(''+r.id+'')" style="flex:1;padding:8px;background:#166534;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">✓ 核准</button><button onclick="mgrRejectLeave(''+r.id+'')" style="flex:1;padding:8px;background:#991b1b;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">✕ 駁回</button></div></div>';
+      });
+    }
+    
+    // OT requests
+    return db.collection(fbEnv+'_hrdata').doc('otRecords').get();
+  }).then(function(doc){
+    var ots=(doc.exists?doc.data().data||[]:[]).filter(function(r){return r.status==='待審核'});
+    if(ots.length>0){
+      h+='<div style="font-size:13px;font-weight:700;color:#92400e;margin:10px 0 6px">⏰ 加班 ('+ots.length+')</div>';
+      ots.forEach(function(r){
+        h+='<div style="padding:10px;background:#fef3c7;border:1px solid #fde68a;border-radius:8px;margin-bottom:6px"><div style="font-weight:700">'+(r.name||r.eid)+' '+r.date+'</div><div style="font-size:12px;color:#666">'+r.hours+'小時 '+(r.reason||'')+'</div><div style="display:flex;gap:6px;margin-top:6px"><button onclick="mgrApproveOT(''+r.id+'')" style="flex:1;padding:8px;background:#166534;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">✓ 核准</button><button onclick="mgrRejectOT(''+r.id+'')" style="flex:1;padding:8px;background:#991b1b;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">✕ 駁回</button></div></div>';
+      });
+    }
+    
+    // Swap requests
+    return db.collection(fbEnv+'_hrdata').doc('swapRecords').get();
+  }).then(function(doc){
+    var swaps=(doc.exists?doc.data().data||[]:[]).filter(function(r){return r.status==='待審核'});
+    if(swaps.length>0){
+      h+='<div style="font-size:13px;font-weight:700;color:#7c3aed;margin:10px 0 6px">🔄 換班 ('+swaps.length+')</div>';
+      swaps.forEach(function(r){
+        h+='<div style="padding:10px;background:#ede9fe;border:1px solid #c4b5fd;border-radius:8px;margin-bottom:6px"><div style="font-weight:700">'+r.fromName+' ⇄ '+r.toName+'</div><div style="font-size:12px;color:#666">'+r.date+' '+(r.reason||'')+'</div><div style="display:flex;gap:6px;margin-top:6px"><button onclick="mgrApproveSwap(''+r.id+'')" style="flex:1;padding:8px;background:#166534;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">✓ 核准</button><button onclick="mgrRejectSwap(''+r.id+'')" style="flex:1;padding:8px;background:#991b1b;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">✕ 駁回</button></div></div>';
+      });
+    }
+    
+    // PreLeave
+    return db.collection(fbEnv+'_hrdata').doc('preLeave').get();
+  }).then(function(doc){
+    var pls=(doc.exists?doc.data().data||[]:[]).filter(function(r){return r.status==='待審核'});
+    if(pls.length>0){
+      h+='<div style="font-size:13px;font-weight:700;color:#0369a1;margin:10px 0 6px">🗓 劃休 ('+pls.length+')</div>';
+      pls.forEach(function(r){
+        h+='<div style="padding:10px;background:#e0f2fe;border:1px solid #7dd3fc;border-radius:8px;margin-bottom:6px"><div style="font-weight:700">'+r.name+' '+r.month+'</div><div style="font-size:12px;color:#666">休假：'+r.dates.join(', ')+'</div><div style="display:flex;gap:6px;margin-top:6px"><button onclick="mgrApprovePL(''+r.id+'')" style="flex:1;padding:8px;background:#166534;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">✓ 核准</button><button onclick="mgrRejectPL(''+r.id+'')" style="flex:1;padding:8px;background:#991b1b;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">✕ 駁回</button></div></div>';
+      });
+    }
+    
+    // Makeup punch
+    return db.collection(fbEnv+'_hrdata').doc('punchApplies').get();
+  }).then(function(doc){
+    var mas=(doc.exists?doc.data().data||[]:[]).filter(function(r){return r.status==='待審核'});
+    if(mas.length>0){
+      h+='<div style="font-size:13px;font-weight:700;color:#166534;margin:10px 0 6px">📋 補打卡 ('+mas.length+')</div>';
+      mas.forEach(function(r){
+        h+='<div style="padding:10px;background:#dcfce7;border:1px solid #bbf7d0;border-radius:8px;margin-bottom:6px"><div style="font-weight:700">'+r.name+' '+r.type+'</div><div style="font-size:12px;color:#666">'+r.date+' '+r.time.substring(0,5)+' '+r.reason+'</div><div style="display:flex;gap:6px;margin-top:6px"><button onclick="mgrApproveMakeup(''+r.id+'')" style="flex:1;padding:8px;background:#166534;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">✓ 核准</button><button onclick="mgrRejectMakeup(''+r.id+'')" style="flex:1;padding:8px;background:#991b1b;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">✕ 駁回</button></div></div>';
+      });
+    }
+    
+    if(!h)h='<div style="text-align:center;padding:30px;color:var(--gray4)">✅ 目前沒有待審核事項</div>';
+    document.getElementById('mgr-approve-list').innerHTML=h;
+  }).catch(function(e){
+    document.getElementById('mgr-approve-list').innerHTML='<div style="color:var(--red);padding:10px">載入失敗：'+e.message+'</div>';
+  });
+}
+
+// Approve/Reject functions
+function mgrApproveLeave(id){if(!confirm('確認核准？'))return;db.collection(fbEnv+'_hrdata').doc('leave').get().then(function(doc){var data=doc.data();var r=data.leaveRecords.find(function(x){return x.id===id});if(r){r.status=mgrRole==='老闆'?'已核准':'店長核准'}db.collection(fbEnv+'_hrdata').doc('leave').set(data).then(function(){alert('✅ 已核准');loadMgrApprove()})}).catch(function(e){alert('失敗：'+e.message)})}
+function mgrRejectLeave(id){var reason=prompt('駁回原因：');if(!reason)return;db.collection(fbEnv+'_hrdata').doc('leave').get().then(function(doc){var data=doc.data();var r=data.leaveRecords.find(function(x){return x.id===id});if(r){r.status='已駁回';r.rejectReason=reason}db.collection(fbEnv+'_hrdata').doc('leave').set(data).then(function(){alert('已駁回');loadMgrApprove()})}).catch(function(e){alert('失敗：'+e.message)})}
+
+function mgrApproveOT(id){if(!confirm('確認核准？'))return;db.collection(fbEnv+'_hrdata').doc('otRecords').get().then(function(doc){var data=doc.data().data||[];var r=data.find(function(x){return x.id===id});if(r)r.status='已核准';db.collection(fbEnv+'_hrdata').doc('otRecords').set({data:data}).then(function(){alert('✅ 已核准');loadMgrApprove()})}).catch(function(e){alert('失敗：'+e.message)})}
+function mgrRejectOT(id){var reason=prompt('拒絕原因：');if(!reason)return;db.collection(fbEnv+'_hrdata').doc('otRecords').get().then(function(doc){var data=doc.data().data||[];var r=data.find(function(x){return x.id===id});if(r){r.status='已拒絕';r.rejectReason=reason}db.collection(fbEnv+'_hrdata').doc('otRecords').set({data:data}).then(function(){alert('已拒絕');loadMgrApprove()})}).catch(function(e){alert('失敗：'+e.message)})}
+
+function mgrApproveSwap(id){if(!confirm('確認核准？'))return;db.collection(fbEnv+'_hrdata').doc('swapRecords').get().then(function(doc){var data=doc.data().data||[];var r=data.find(function(x){return x.id===id});if(r)r.status='已核准';db.collection(fbEnv+'_hrdata').doc('swapRecords').set({data:data}).then(function(){alert('✅ 已核准');loadMgrApprove()})}).catch(function(e){alert('失敗：'+e.message)})}
+function mgrRejectSwap(id){var reason=prompt('拒絕原因：');if(!reason)return;db.collection(fbEnv+'_hrdata').doc('swapRecords').get().then(function(doc){var data=doc.data().data||[];var r=data.find(function(x){return x.id===id});if(r){r.status='已拒絕';r.rejectReason=reason}db.collection(fbEnv+'_hrdata').doc('swapRecords').set({data:data}).then(function(){alert('已拒絕');loadMgrApprove()})}).catch(function(e){alert('失敗：'+e.message)})}
+
+function mgrApprovePL(id){if(!confirm('確認核准？'))return;db.collection(fbEnv+'_hrdata').doc('preLeave').get().then(function(doc){var data=doc.data().data||[];var r=data.find(function(x){return x.id===id});if(r)r.status='已核准';db.collection(fbEnv+'_hrdata').doc('preLeave').set({data:data}).then(function(){alert('✅ 已核准');loadMgrApprove()})}).catch(function(e){alert('失敗：'+e.message)})}
+function mgrRejectPL(id){var reason=prompt('拒絕原因：');if(!reason)return;db.collection(fbEnv+'_hrdata').doc('preLeave').get().then(function(doc){var data=doc.data().data||[];var r=data.find(function(x){return x.id===id});if(r){r.status='已拒絕';r.rejectReason=reason}db.collection(fbEnv+'_hrdata').doc('preLeave').set({data:data}).then(function(){alert('已拒絕');loadMgrApprove()})}).catch(function(e){alert('失敗：'+e.message)})}
+
+function mgrApproveMakeup(id){if(!confirm('確認核准補打卡？'))return;db.collection(fbEnv+'_hrdata').doc('punchApplies').get().then(function(doc){var data=doc.data().data||[];var r=data.find(function(x){return x.id===id});if(r){r.status='已核准';db.collection(fbEnv+'_hrdata').doc('punchApplies').set({data:data});db.collection(fbEnv+'_hrdata').doc('punchRecords').get().then(function(pdoc){var pdata=pdoc.exists?pdoc.data().data||[]:[];pdata.push({id:'p'+Date.now(),eid:r.eid,name:r.name,store:r.store,date:r.date,time:r.time,type:r.type,gps:'補打卡(APP)',ts:new Date().toISOString()});db.collection(fbEnv+'_hrdata').doc('punchRecords').set({data:pdata}).then(function(){alert('✅ 已核准，打卡紀錄已寫入');loadMgrApprove()})})}}).catch(function(e){alert('失敗：'+e.message)})}
+function mgrRejectMakeup(id){var reason=prompt('拒絕原因：');if(!reason)return;db.collection(fbEnv+'_hrdata').doc('punchApplies').get().then(function(doc){var data=doc.data().data||[];var r=data.find(function(x){return x.id===id});if(r){r.status='已拒絕';r.rejectReason=reason}db.collection(fbEnv+'_hrdata').doc('punchApplies').set({data:data}).then(function(){alert('已拒絕');loadMgrApprove()})}).catch(function(e){alert('失敗：'+e.message)})}
+
+// Attendance
+function loadMgrAttend(){
+  if(!db)return;
+  var today=new Date().toISOString().substring(0,10);
+  document.getElementById('mgr-att-date').value=today;
+  var sel=document.getElementById('mgr-att-emp');
+  sel.innerHTML='<option value="">全部員工</option>';
+  staff.forEach(function(e){if(!e.leave_date)sel.innerHTML+='<option value="'+e.id+'">'+e.name+'</option>'});
+  
+  db.collection(fbEnv+'_hrdata').doc('punchRecords').get().then(function(doc){
+    var data=doc.exists?doc.data().data||[]:[];
+    var todayPunches=data.filter(function(r){return r.date===today});
+    var h='<div style="font-size:12px;color:#666;margin-bottom:8px">'+today+' 共 '+todayPunches.length+' 筆打卡</div>';
+    var byEmp={};
+    todayPunches.forEach(function(r){if(!byEmp[r.eid])byEmp[r.eid]={name:r.name,punches:[]};byEmp[r.eid].punches.push(r)});
+    
+    for(var eid in byEmp){
+      var emp=byEmp[eid];
+      var clockIn=emp.punches.find(function(p){return p.type==='上班'});
+      var clockOut=emp.punches.find(function(p){return p.type==='下班'});
+      var inTime=clockIn?clockIn.time.substring(0,5):'—';
+      var outTime=clockOut?clockOut.time.substring(0,5):'—';
+      var inColor=clockIn?'#166534':'#991b1b';
+      h+='<div style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid var(--gray1);font-size:13px"><span style="flex:1;font-weight:700">'+emp.name+'</span><span style="font-family:JetBrains Mono,monospace;color:'+inColor+'">'+inTime+'</span><span style="margin:0 6px;color:#999">~</span><span style="font-family:JetBrains Mono,monospace">'+outTime+'</span></div>';
+    }
+    
+    var notPunched=staff.filter(function(e){return!e.leave_date&&!byEmp[e.id]});
+    if(notPunched.length>0){
+      h+='<div style="font-size:12px;font-weight:700;color:#991b1b;margin-top:10px">⚠ 未打卡 ('+notPunched.length+')</div>';
+      notPunched.forEach(function(e){
+        h+='<div style="padding:4px 0;font-size:12px;color:#991b1b">'+e.name+' ('+e.store+')</div>';
+      });
+    }
+    document.getElementById('mgr-attend-today').innerHTML=h;
+  }).catch(function(){});
+}
+
+function mgrSearchPunch(){
+  var eid=document.getElementById('mgr-att-emp').value;
+  var date=document.getElementById('mgr-att-date').value;
+  if(!date){alert('請選擇日期');return}
+  db.collection(fbEnv+'_hrdata').doc('punchRecords').get().then(function(doc){
+    var data=doc.exists?doc.data().data||[]:[];
+    var filtered=data.filter(function(r){
+      if(eid&&r.eid!==eid)return false;
+      return r.date===date;
+    });
+    var h='';
+    if(filtered.length===0){h='<div style="text-align:center;padding:16px;color:var(--gray4)">無紀錄</div>'}
+    filtered.forEach(function(r){
+      var tc=r.type==='上班'?'#166534':r.type==='下班'?'#991b1b':'#92400e';
+      h+='<div style="display:flex;align-items:center;padding:6px 0;border-bottom:1px solid var(--gray1);font-size:12px"><span style="min-width:60px;font-weight:700">'+r.name+'</span><span style="padding:2px 8px;background:#f0f0f0;border-radius:4px;color:'+tc+';font-weight:700;font-size:11px;min-width:50px;text-align:center">'+r.type+'</span><span style="font-family:JetBrains Mono,monospace;font-weight:700;margin-left:8px">'+r.time.substring(0,5)+'</span></div>';
+    });
+    document.getElementById('mgr-punch-result').innerHTML=h;
+  }).catch(function(e){alert('查詢失敗：'+e.message)});
+}
+
+// Report
+function loadMgrReport(){
+  if(!db)return;
+  db.collection(fbEnv+'_hrdata').doc('empStats').get().then(function(doc){
+    var stats=doc.exists?doc.data().data||{}:{};
+    var totalStaff=staff.filter(function(e){return!e.leave_date}).length;
+    var totalVac=0,totalAttend=0,totalLate=0;
+    for(var eid in stats){var s=stats[eid];totalVac+=s.vacLeft||0;totalAttend+=s.attendDays||0;totalLate+=s.lateMins||0}
+    
+    var now=new Date();
+    var month=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+    
+    var h='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+    h+='<div style="background:var(--gray1);border-radius:12px;padding:14px;text-align:center"><div style="font-size:24px;font-weight:700;color:#0369a1;font-family:JetBrains Mono,monospace">'+totalStaff+'</div><div style="font-size:11px;color:var(--gray4)">在職人數</div></div>';
+    h+='<div style="background:var(--gray1);border-radius:12px;padding:14px;text-align:center"><div style="font-size:24px;font-weight:700;color:#166534;font-family:JetBrains Mono,monospace">'+Math.round(totalAttend/Math.max(totalStaff,1))+'</div><div style="font-size:11px;color:var(--gray4)">平均出勤(天)</div></div>';
+    h+='<div style="background:var(--gray1);border-radius:12px;padding:14px;text-align:center"><div style="font-size:24px;font-weight:700;color:#0e7490;font-family:JetBrains Mono,monospace">'+totalVac+'</div><div style="font-size:11px;color:var(--gray4)">總特休餘額(天)</div></div>';
+    h+='<div style="background:var(--gray1);border-radius:12px;padding:14px;text-align:center"><div style="font-size:24px;font-weight:700;color:'+(totalLate>60?'#991b1b':'#166534')+';font-family:JetBrains Mono,monospace">'+totalLate+'</div><div style="font-size:11px;color:var(--gray4)">總遲到(分鐘)</div></div>';
+    h+='</div>';
+    document.getElementById('mgr-report-summary').innerHTML=h;
+    
+    // Staff detail
+    var h2='';
+    staff.forEach(function(e){
+      if(e.leave_date)return;
+      var s=stats[e.id]||{};
+      h2+='<div style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid var(--gray1);font-size:12px"><span style="flex:1;font-weight:700">'+e.name+'</span><span style="min-width:50px;text-align:center">特休'+((s.vacLeft||0))+'天</span><span style="min-width:50px;text-align:center">出勤'+(s.attendDays||0)+'天</span><span style="min-width:50px;text-align:center;color:'+(s.lateMins>0?'#991b1b':'#166534')+'">遲到'+(s.lateMins||0)+'分</span></div>';
+    });
+    document.getElementById('mgr-report-staff').innerHTML=h2;
+  }).catch(function(){});
+}
+
 
 // Init
 localStorage.setItem('hm_app_fb',JSON.stringify(_DEFAULT_FB));initFb();
