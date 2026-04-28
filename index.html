@@ -391,7 +391,7 @@ var DOW=['日','一','二','三','四','五','六'];
 
 function saveAppFb(){var k=document.getElementById('app-fb-key').value.trim();var p=document.getElementById('app-fb-proj').value.trim();if(!k||!p){alert('請填入API Key和Project ID');return}localStorage.setItem('hm_app_fb',JSON.stringify({apiKey:k,projectId:p,authDomain:p+'.firebaseapp.com'}));alert('Firebase設定已儲存，請登入');initFb()}
 
-function initFb(){try{if(firebase.auth)firebase.auth().signInAnonymously().catch(function(){})}catch(e){}var cfg=null;try{cfg=JSON.parse(localStorage.getItem('hm_app_fb'))}catch(e){}if(!cfg)return false;try{var app;try{app=firebase.app()}catch(e){app=firebase.initializeApp(cfg)}db=firebase.firestore();return true}catch(e){return false}}
+function initFb(){var cfg=null;try{cfg=JSON.parse(localStorage.getItem('hm_app_fb'))}catch(e){}if(!cfg)return false;try{var app;try{app=firebase.app()}catch(e){app=firebase.initializeApp(cfg)}db=firebase.firestore();try{firebase.auth().signInAnonymously().catch(function(){})}catch(e){}return true}catch(e){return false}}
 
 function appLogin(){var u=document.getElementById('app-user').value.trim();var p=document.getElementById('app-pass').value;if(!u||!p){showErr('請輸入帳號和密碼');return}if(!db){var localAccts=JSON.parse(localStorage.getItem('hm_app_accounts')||'[]');var acct=localAccts.find(function(a){return a.user===u&&verifyPass(p,a.pass)});if(acct){finishLogin(acct);return}showErr('請先設定Firebase連線');return}db.collection(fbEnv+'_hrdata').doc('accounts').get().then(function(doc){if(!doc.exists){showErr('無法取得帳號資料');return}var accounts=doc.data().userAccounts||[];var acct=accounts.find(function(a){return a.user===u&&verifyPass(p,a.pass)});if(!acct){showErr('帳號或密碼錯誤');return}localStorage.setItem('hm_app_accounts',JSON.stringify(accounts));acct._plain=p;finishLogin(acct)}).catch(function(e){var localAccts=JSON.parse(localStorage.getItem('hm_app_accounts')||'[]');var acct=localAccts.find(function(a){return a.user===u&&verifyPass(p,a.pass)});if(acct){document.getElementById('offline-bar').style.display='block';finishLogin(acct)}else{showErr('連線失敗：'+e.message)}})}
 
@@ -544,7 +544,7 @@ function loadMgrApprove(){
       h+='<div style="font-size:13px;font-weight:700;color:#1e40af;margin-bottom:6px">📝 假單 ('+leaves.length+')</div>';
       leaves.forEach(function(r){
         var emp=staff.find(function(x){return x.id===r.eid})||{};
-        h+='<div style="padding:10px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;margin-bottom:6px"><div style="font-weight:700;font-size:14px">'+r.type+' '+(emp.name||r.eid)+'</div><div style="font-size:12px;color:#666">'+r.start+' ~ '+r.end+' ('+r.days+'天)</div><div style="font-size:12px;color:#666">'+(r.reason||'')+'</div><div style="display:flex;gap:6px;margin-top:6px"><button onclick="mgrApproveLeave(''+r.id+'')" style="flex:1;padding:8px;background:#166534;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">✓ 核准</button><button onclick="mgrRejectLeave(''+r.id+'')" style="flex:1;padding:8px;background:#991b1b;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">✕ 駁回</button></div></div>';
+        h+='<div style="padding:10px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;margin-bottom:6px"><div style="font-weight:700;font-size:14px">'+r.type+' '+(emp.name||r.eid)+'</div><div style="font-size:12px;color:#666">'+r.start+' ~ '+r.end+' ('+r.days+'天)</div><div style="font-size:12px;color:#666">'+(r.reason||'')+'</div><div style="display:flex;gap:6px;margin-top:6px"><button onclick="mgrApproveLeave(\''+r.id+'\')" style="flex:1;padding:8px;background:#166534;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">✓ 核准</button><button onclick="mgrRejectLeave(\''+r.id+'\')" style="flex:1;padding:8px;background:#991b1b;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">✕ 駁回</button></div></div>';
       });
     }
     
@@ -555,7 +555,7 @@ function loadMgrApprove(){
     if(ots.length>0){
       h+='<div style="font-size:13px;font-weight:700;color:#92400e;margin:10px 0 6px">⏰ 加班 ('+ots.length+')</div>';
       ots.forEach(function(r){
-        h+='<div style="padding:10px;background:#fef3c7;border:1px solid #fde68a;border-radius:8px;margin-bottom:6px"><div style="font-weight:700">'+(r.name||r.eid)+' '+r.date+'</div><div style="font-size:12px;color:#666">'+r.hours+'小時 '+(r.reason||'')+'</div><div style="display:flex;gap:6px;margin-top:6px"><button onclick="mgrApproveOT(''+r.id+'')" style="flex:1;padding:8px;background:#166534;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">✓ 核准</button><button onclick="mgrRejectOT(''+r.id+'')" style="flex:1;padding:8px;background:#991b1b;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">✕ 駁回</button></div></div>';
+        h+='<div style="padding:10px;background:#fef3c7;border:1px solid #fde68a;border-radius:8px;margin-bottom:6px"><div style="font-weight:700">'+(r.name||r.eid)+' '+r.date+'</div><div style="font-size:12px;color:#666">'+r.hours+'小時 '+(r.reason||'')+'</div><div style="display:flex;gap:6px;margin-top:6px"><button onclick="mgrApproveOT(\''+r.id+'\')" style="flex:1;padding:8px;background:#166534;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">✓ 核准</button><button onclick="mgrRejectOT(\''+r.id+'\')" style="flex:1;padding:8px;background:#991b1b;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">✕ 駁回</button></div></div>';
       });
     }
     
@@ -566,7 +566,7 @@ function loadMgrApprove(){
     if(swaps.length>0){
       h+='<div style="font-size:13px;font-weight:700;color:#7c3aed;margin:10px 0 6px">🔄 換班 ('+swaps.length+')</div>';
       swaps.forEach(function(r){
-        h+='<div style="padding:10px;background:#ede9fe;border:1px solid #c4b5fd;border-radius:8px;margin-bottom:6px"><div style="font-weight:700">'+r.fromName+' ⇄ '+r.toName+'</div><div style="font-size:12px;color:#666">'+r.date+' '+(r.reason||'')+'</div><div style="display:flex;gap:6px;margin-top:6px"><button onclick="mgrApproveSwap(''+r.id+'')" style="flex:1;padding:8px;background:#166534;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">✓ 核准</button><button onclick="mgrRejectSwap(''+r.id+'')" style="flex:1;padding:8px;background:#991b1b;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">✕ 駁回</button></div></div>';
+        h+='<div style="padding:10px;background:#ede9fe;border:1px solid #c4b5fd;border-radius:8px;margin-bottom:6px"><div style="font-weight:700">'+r.fromName+' ⇄ '+r.toName+'</div><div style="font-size:12px;color:#666">'+r.date+' '+(r.reason||'')+'</div><div style="display:flex;gap:6px;margin-top:6px"><button onclick="mgrApproveSwap(\''+r.id+'\')" style="flex:1;padding:8px;background:#166534;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">✓ 核准</button><button onclick="mgrRejectSwap(\''+r.id+'\')" style="flex:1;padding:8px;background:#991b1b;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">✕ 駁回</button></div></div>';
       });
     }
     
@@ -577,7 +577,7 @@ function loadMgrApprove(){
     if(pls.length>0){
       h+='<div style="font-size:13px;font-weight:700;color:#0369a1;margin:10px 0 6px">🗓 劃休 ('+pls.length+')</div>';
       pls.forEach(function(r){
-        h+='<div style="padding:10px;background:#e0f2fe;border:1px solid #7dd3fc;border-radius:8px;margin-bottom:6px"><div style="font-weight:700">'+r.name+' '+r.month+'</div><div style="font-size:12px;color:#666">休假：'+r.dates.join(', ')+'</div><div style="display:flex;gap:6px;margin-top:6px"><button onclick="mgrApprovePL(''+r.id+'')" style="flex:1;padding:8px;background:#166534;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">✓ 核准</button><button onclick="mgrRejectPL(''+r.id+'')" style="flex:1;padding:8px;background:#991b1b;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">✕ 駁回</button></div></div>';
+        h+='<div style="padding:10px;background:#e0f2fe;border:1px solid #7dd3fc;border-radius:8px;margin-bottom:6px"><div style="font-weight:700">'+r.name+' '+r.month+'</div><div style="font-size:12px;color:#666">休假：'+r.dates.join(', ')+'</div><div style="display:flex;gap:6px;margin-top:6px"><button onclick="mgrApprovePL(\''+r.id+'\')" style="flex:1;padding:8px;background:#166534;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">✓ 核准</button><button onclick="mgrRejectPL(\''+r.id+'\')" style="flex:1;padding:8px;background:#991b1b;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">✕ 駁回</button></div></div>';
       });
     }
     
@@ -588,7 +588,7 @@ function loadMgrApprove(){
     if(mas.length>0){
       h+='<div style="font-size:13px;font-weight:700;color:#166534;margin:10px 0 6px">📋 補打卡 ('+mas.length+')</div>';
       mas.forEach(function(r){
-        h+='<div style="padding:10px;background:#dcfce7;border:1px solid #bbf7d0;border-radius:8px;margin-bottom:6px"><div style="font-weight:700">'+r.name+' '+r.type+'</div><div style="font-size:12px;color:#666">'+r.date+' '+r.time.substring(0,5)+' '+r.reason+'</div><div style="display:flex;gap:6px;margin-top:6px"><button onclick="mgrApproveMakeup(''+r.id+'')" style="flex:1;padding:8px;background:#166534;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">✓ 核准</button><button onclick="mgrRejectMakeup(''+r.id+'')" style="flex:1;padding:8px;background:#991b1b;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">✕ 駁回</button></div></div>';
+        h+='<div style="padding:10px;background:#dcfce7;border:1px solid #bbf7d0;border-radius:8px;margin-bottom:6px"><div style="font-weight:700">'+r.name+' '+r.type+'</div><div style="font-size:12px;color:#666">'+r.date+' '+r.time.substring(0,5)+' '+r.reason+'</div><div style="display:flex;gap:6px;margin-top:6px"><button onclick="mgrApproveMakeup(\''+r.id+'\')" style="flex:1;padding:8px;background:#166534;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">✓ 核准</button><button onclick="mgrRejectMakeup(\''+r.id+'\')" style="flex:1;padding:8px;background:#991b1b;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">✕ 駁回</button></div></div>';
       });
     }
     
@@ -707,7 +707,7 @@ function loadMgrReport(){
 // Init
 localStorage.setItem('hm_app_fb',JSON.stringify(_DEFAULT_FB));initFb();
 try{var fb=JSON.parse(localStorage.getItem('hm_app_fb'));if(fb){document.getElementById('app-fb-key').value=fb.apiKey||'';document.getElementById('app-fb-proj').value=fb.projectId||''}}catch(e){}
-try{var sess=JSON.parse(localStorage.getItem('hm_app_session'));if(sess){document.getElementById('app-user').value=sess.user;document.getElementById('app-pass').value=sess.pass;appAutoLogin(sess)}}catch(e){}
+try{var sess=JSON.parse(localStorage.getItem('hm_app_session'));if(sess){document.getElementById('app-user').value=sess.user;document.getElementById('app-pass').value=sess.pass;setTimeout(function(){appAutoLogin(sess)},1500)}}catch(e){}
 </script>
 </body>
 </html>
