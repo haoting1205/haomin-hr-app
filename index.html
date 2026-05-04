@@ -51,8 +51,8 @@ body{font-family:'Noto Sans TC',sans-serif;background:#eef2f7;color:var(--gray6)
 .fi:focus{border-color:var(--blue)}
 .fl{font-size:11px;font-weight:700;color:var(--gray4);margin-bottom:4px;display:block;text-transform:uppercase;letter-spacing:.5px}
 .form-group{margin-bottom:14px}
-.login-screen{position:fixed;inset:0;background:linear-gradient(135deg,#0a1220,#1a2d52,#0f1b35);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px}
-.login-box{background:var(--white);border-radius:20px;padding:36px 28px;width:100%;max-width:360px;text-align:center}
+.login-screen{position:fixed;inset:0;background:linear-gradient(135deg,#0a1220,#1a2d52,#0f1b35);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto}
+.login-box{background:var(--white);border-radius:20px;padding:36px 28px;width:100%;max-width:360px;text-align:center;margin:auto 0;margin-top:20px;margin-bottom:40px}
 .login-box h1{font-size:22px;color:var(--navy);margin-bottom:4px}
 .login-box .sub{font-size:13px;color:var(--gray4);margin-bottom:24px;letter-spacing:1px}
 .punch-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--gray1);font-size:13px}
@@ -148,8 +148,8 @@ body{font-family:'Noto Sans TC',sans-serif;background:#eef2f7;color:var(--gray6)
 
 <!-- 班表 -->
 <div class="screen" id="screen-sched"><div style="padding:8px 16px 0;display:flex;gap:8px"><button onclick="openAppSwap()" style="padding:6px 14px;background:#7c3aed;color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">🔄 換班申請</button></div>
-<div class="card">
-<div class="card-title">📅 我的班表</div>
+<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap"><button class="btn btn-outline" style="flex:1;padding:8px;font-size:12px;font-weight:700" id="sched-tab-my" onclick="switchSchedView('my')">📋 我的班表</button><button class="btn btn-outline" style="flex:1;padding:8px;font-size:12px;font-weight:700" id="sched-tab-store" onclick="switchSchedView('store')">🏪 門市班表</button></div><div id="sched-store-select" style="display:none;margin-bottom:10px"><select class="fi" id="app-sched-store" onchange="renderSchedStore()" style="font-size:14px;padding:10px"><option value="總公司">總公司（中央廚房）</option><option value="交大店">交大店</option><option value="台積電店">台積電店</option></select></div><div class="card">
+<div class="card-title" id="sched-title">📅 我的班表</div>
 <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
 <button class="btn btn-outline" style="width:auto;padding:8px 14px;font-size:13px" onclick="changeMonth(-1)">◀</button>
 <div style="flex:1;text-align:center;font-size:16px;font-weight:700" id="sched-month">──</div>
@@ -413,7 +413,7 @@ function loadData(){if(!db){renderAll();return}db.collection(fbEnv+'_employees')
 
 function findCurEmp(){if(curAcct&&curAcct.empId){curEmp=staff.find(function(e){return e.id===curAcct.empId})}if(!curEmp&&staff.length){curEmp=staff[0]}}
 
-function switchScreen(name){document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active')});document.querySelectorAll('.tab-btn').forEach(function(t){t.classList.remove('active')});document.getElementById('screen-'+name).classList.add('active');document.getElementById('tab-'+name).classList.add('active');if(name==='home'&&typeof loadEmpStats==='function')loadEmpStats();if(name==='approve')loadMgrApprove();if(name==='attend')loadMgrAttend();if(name==='report')loadMgrReport();if(name==='punch')initPunchScreen();if(name==='sched')renderSched();if(name==='leave')renderLeave();if(name==='pay')renderPay();if(name==='me')renderMe();if(name==='preleave')renderPreLeave();if(name==='swap')openAppSwap();if(name==='sop'){}}
+function switchScreen(name){document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active')});document.querySelectorAll('.tab-btn').forEach(function(t){t.classList.remove('active')});document.getElementById('screen-'+name).classList.add('active');document.getElementById('tab-'+name).classList.add('active');if(name==='home'&&typeof loadEmpStats==='function')loadEmpStats();if(name==='approve')loadMgrApprove();if(name==='attend')loadMgrAttend();if(name==='report')loadMgrReport();if(name==='punch')initPunchScreen();if(name==='sched'){if(schedViewMode==='store')renderSchedStore();else renderSched()}if(name==='leave')renderLeave();if(name==='pay')renderPay();if(name==='me')renderMe();if(name==='preleave')renderPreLeave();if(name==='swap')openAppSwap();if(name==='sop'){}}
 
 function renderAll(){if(!curEmp){document.getElementById('home-name').textContent='未綁定員工';return}document.getElementById('app-name').textContent=curEmp.name;document.getElementById('app-role').textContent=curEmp.role+' · '+(curEmp.store||'');document.getElementById('home-avatar').textContent=curEmp.name[0];document.getElementById('home-name').textContent=curEmp.name;document.getElementById('home-sub').textContent=curEmp.role+' · '+(curEmp.store||'')+' · 到職 '+(curEmp.hire_date||'─');document.getElementById('home-vac').textContent='─';document.getElementById('home-attend').textContent='─'}
 
@@ -432,7 +432,7 @@ function renderPunchToday(){var now=new Date();var today=now.getFullYear()+'-'+p
 
 function changeMonth(d){viewM+=d;if(viewM>12){viewM=1;viewY++}if(viewM<1){viewM=12;viewY--}renderSched()}
 
-function renderSched(){document.getElementById('sched-month').textContent='民國'+viewY+'年'+viewM+'月';if(!curEmp){document.getElementById('sched-list').innerHTML='<div style="text-align:center;padding:20px;color:var(--gray4)">未綁定員工</div>';return}var D=new Date(viewY+1911,viewM,0).getDate();var h='';for(var d=1;d<=D;d++){var dt=new Date(viewY+1911,viewM-1,d);var dw=dt.getDay();var key=(viewY+1911)+'-'+pad(viewM)+'-'+pad(d);var sc=sched[curEmp.id]?sched[curEmp.id][key]:null;var isWknd=dw===0||dw===6;var dayColor=isWknd?'#991b1b':'var(--gray6)';h+='<div class="sched-day" style="'+(isWknd?'background:#fff5f5;border-radius:8px;padding:10px;margin:-2px -4px':'')+'"><span class="day" style="color:'+dayColor+'">'+viewM+'/'+d+'<br><span style="font-size:11px;color:var(--gray4)">('+DOW[dw]+')</span></span>';if(sc&&LEAVE.indexOf(sc.type)>=0){var lc=sc.type==='例假'?'#166534':sc.type==='特休'?'#0e7490':sc.type==='事假'?'#991b1b':'#6d28d9';h+='<span class="leave" style="color:'+lc+'">'+sc.type+'</span>'}else if(sc){h+='<span class="time">'+fT(sc.sh,sc.sm)+' - '+fT(sc.eh,sc.em)+'</span>'}else if(dw===0){h+='<span class="leave" style="color:#166534">例假</span>'}else if(curEmp){h+='<span class="time">'+fT(curEmp.sh||9,curEmp.sm||0)+' - '+fT(curEmp.eh||17,curEmp.em||0)+'</span>'}h+='</div>'}document.getElementById('sched-list').innerHTML=h}
+function renderSched(){document.getElementById('sched-month').textContent='民國'+viewY+'年'+viewM+'月';if(!curEmp){document.getElementById('sched-list').innerHTML='<div style="text-align:center;padding:20px;color:var(--gray4)">未綁定員工</div>';return}var D=new Date(viewY+1911,viewM,0).getDate();var h='';for(var d=1;d<=D;d++){var dt=new Date(viewY+1911,viewM-1,d);var dw=dt.getDay();var key=(viewY+1911)+'-'+pad(viewM)+'-'+pad(d);var sc=sched[curEmp.id]?sched[curEmp.id][key]:null;var isWknd=dw===0||dw===6;var dayColor=isWknd?'#991b1b':'var(--gray6)';h+='<div class="sched-day" style="'+(isWknd?'background:#fff5f5;border-radius:8px;padding:10px;margin:-2px -4px':'')+'"><span class="day" style="color:'+dayColor+'">'+viewM+'/'+d+'<br><span style="font-size:11px;color:var(--gray4)">('+DOW[dw]+')</span></span>';if(sc&&LEAVE.indexOf(sc.type)>=0){var lc=sc.type==='例假'?'#166534':sc.type==='特休'?'#0e7490':sc.type==='事假'?'#991b1b':'#6d28d9';h+='<span class="leave" style="color:'+lc+'">'+sc.type+'</span>'}else if(sc){h+='<span class="time">'+fT(sc.sh,sc.sm)+' - '+fT(sc.eh,sc.em)+(sc.store&&sc.store!==curEmp.store?' <span style="font-size:10px;background:#7c3aed;color:#fff;padding:1px 6px;border-radius:4px;margin-left:4px">'+sc.store+'</span>':'')+'</span>'}else if(dw===0){h+='<span class="leave" style="color:#166534">例假</span>'}else if(curEmp){h+='<span class="time">'+fT(curEmp.sh||9,curEmp.sm||0)+' - '+fT(curEmp.eh||17,curEmp.em||0)+'</span>'}h+='</div>'}document.getElementById('sched-list').innerHTML=h}
 
 function submitLeave(){if(!curEmp){alert('未綁定員工');return}var type=document.getElementById('al-type').value;var start=document.getElementById('al-start').value;var end=document.getElementById('al-end').value;var reason=document.getElementById('al-reason').value;var unit=document.getElementById('al-unit').value;if(!start||!end){alert('請選擇日期');return}if(!reason){alert('請填寫事由');return}var days=unit==='半天'?0.5:Math.max(1,Math.round((new Date(end)-new Date(start))/(24*60*60*1000))+1);var rec={id:'lv'+Date.now(),eid:curEmp.id,type:type,start:start,end:end,days:days,reason:reason,status:'待簽核',month:(viewY+1911)+'-'+pad(viewM),unit:unit,agent:'',agentName:'',created:new Date().toISOString()};if(db){db.collection(fbEnv+'_hrdata').doc('leave').get().then(function(doc){var data=doc.exists?doc.data():{leaveRecords:[]};data.leaveRecords.push(rec);db.collection(fbEnv+'_hrdata').doc('leave').set(data);alert('✅ 假單已送出\n'+type+' '+days+'天\n等待主管簽核');document.getElementById('al-reason').value='';renderLeave()}).catch(function(e){alert('送出失敗：'+e.message)})}else{var local=JSON.parse(localStorage.getItem('hm_app_leave')||'[]');local.push(rec);localStorage.setItem('hm_app_leave',JSON.stringify(local));alert('✅ 假單已暫存（離線模式）');renderLeave()}}
 
@@ -716,6 +716,67 @@ function loadMgrReport(){
 
 function getDeviceId(){var id=localStorage.getItem('hm_device_id');if(!id){id='dev_'+Date.now()+'_'+Math.random().toString(36).substring(2,8);localStorage.setItem('hm_device_id',id)}return id}
 function checkDeviceBind(){if(!curEmp||!db)return;var devId=getDeviceId();if(!curEmp.boundDevice){curEmp.boundDevice=devId;db.collection(fbEnv+'_employees').doc(curEmp.id).update({boundDevice:devId}).catch(function(){});console.log('Device bound: '+devId);return}if(curEmp.boundDevice!==devId){alert('⚠ 此帳號已綁定其他裝置\n\n如需更換裝置，請聯繫店長或老闆解除綁定');appLogout();return}}
+
+
+var schedViewMode='my';
+function switchSchedView(mode){
+  schedViewMode=mode;
+  var myBtn=document.getElementById('sched-tab-my');
+  var storeBtn=document.getElementById('sched-tab-store');
+  var storeSel=document.getElementById('sched-store-select');
+  var title=document.getElementById('sched-title');
+  if(mode==='my'){
+    myBtn.style.background='var(--navy)';myBtn.style.color='var(--white)';
+    storeBtn.style.background='var(--white)';storeBtn.style.color='var(--gray6)';
+    storeSel.style.display='none';
+    title.textContent='📅 我的班表';
+    renderSched();
+  }else{
+    storeBtn.style.background='var(--navy)';storeBtn.style.color='var(--white)';
+    myBtn.style.background='var(--white)';myBtn.style.color='var(--gray6)';
+    storeSel.style.display='block';
+    if(curEmp&&curEmp.store){document.getElementById('app-sched-store').value=curEmp.store}
+    renderSchedStore();
+  }
+}
+function renderSchedStore(){
+  var store=document.getElementById('app-sched-store').value;
+  var title=document.getElementById('sched-title');
+  title.textContent='📅 '+store+' 班表';
+  var D=new Date(viewY+1911,viewM,0).getDate();
+  var h='';
+  for(var d=1;d<=D;d++){
+    var dt=new Date(viewY+1911,viewM-1,d);
+    var dw=dt.getDay();
+    var key=(viewY+1911)+'-'+pad(viewM)+'-'+pad(d);
+    var isWknd=dw===0||dw===6;
+    var dayColor=isWknd?'#991b1b':'var(--gray6)';
+    h+='<div style="padding:8px 0;border-bottom:1px solid var(--gray1)"><div style="font-weight:700;font-size:13px;color:'+dayColor+'">'+viewM+'/'+d+' ('+DOW[dw]+')</div>';
+    var dayStaff=[];
+    staff.forEach(function(e){
+      if(e.leave_date&&e.leave_date<key)return;
+      var sc=sched[e.id]?sched[e.id][key]:null;
+      if(!sc)return;
+      if(e.store!==store&&(!sc.store||sc.store!==store))return;
+      if(LEAVE.indexOf(sc.type)>=0){
+        dayStaff.push({name:e.name,text:sc.type,color:'#6d28d9'});
+      }else{
+        dayStaff.push({name:e.name,text:fT(sc.sh,sc.sm)+'-'+fT(sc.eh,sc.em),color:'#0369a1'});
+      }
+    });
+    if(dayStaff.length===0){
+      if(dw===0)h+='<div style="font-size:12px;color:#166534;padding:2px 0">例假</div>';
+      else h+='<div style="font-size:12px;color:var(--gray4);padding:2px 0">無排班資料</div>';
+    }else{
+      dayStaff.forEach(function(s){
+        var isMe=curEmp&&s.name===curEmp.name;
+        h+='<div style="display:flex;align-items:center;gap:6px;padding:2px 0;font-size:12px'+(isMe?';background:#eff6ff;border-radius:4px;padding:2px 6px':'')+'"><span style="min-width:50px;font-weight:'+(isMe?'700':'400')+'">'+s.name+'</span><span style="font-family:JetBrains Mono,monospace;color:'+s.color+';font-weight:700">'+s.text+'</span></div>';
+      });
+    }
+    h+='</div>';
+  }
+  document.getElementById('sched-list').innerHTML=h;
+}
 
 // Init
 localStorage.setItem('hm_app_fb',JSON.stringify(_DEFAULT_FB));initFb();
