@@ -417,12 +417,12 @@ function initFb(){var cfg=null;try{cfg=JSON.parse(localStorage.getItem('hm_app_f
 
 function appLogin(){var u=document.getElementById('app-user').value.trim();var p=document.getElementById('app-pass').value;if(!u||!p){showErr('請輸入帳號和密碼');return}if(!db){var localAccts=JSON.parse(localStorage.getItem('hm_app_accounts')||'[]');var acct=localAccts.find(function(a){return a.user===u&&verifyPass(p,a.pass)});if(acct){finishLogin(acct);return}showErr('請先設定Firebase連線');return}db.collection(fbEnv+'_hrdata').doc('accounts').get().then(function(doc){if(!doc.exists){showErr('無法取得帳號資料');return}var accounts=doc.data().userAccounts||[];var acct=accounts.find(function(a){return a.user===u&&verifyPass(p,a.pass)});if(!acct){showErr('帳號或密碼錯誤');return}localStorage.setItem('hm_app_accounts',JSON.stringify(accounts));acct._plain=p;finishLogin(acct)}).catch(function(e){var localAccts=JSON.parse(localStorage.getItem('hm_app_accounts')||'[]');var acct=localAccts.find(function(a){return a.user===u&&verifyPass(p,a.pass)});if(acct){document.getElementById('offline-bar').style.display='block';finishLogin(acct)}else{showErr('連線失敗：'+e.message)}})}
 
-function finishLogin(acct){curAcct=acct;if(document.getElementById('app-remember').checked){localStorage.setItem('hm_app_session',JSON.stringify({user:acct.user,pass:acct._plain||acct.pass}))}document.getElementById('login-screen').style.display='none';loadData();setTimeout(loadStoreNotes,2500);setTimeout(loadEmpStats,1500);setTimeout(checkMgrRole,500);setTimeout(loadProdSchedule,2000);setTimeout(showProdHomeRemind,3000);setTimeout(checkDeviceBind,800);if(verifyPass(acct.user+'aa',acct.pass)){setTimeout(function(){if(confirm('⚠ 您目前使用預設密碼\n\n為保護帳號安全，建議立即修改密碼。\n\n按「確定」立即修改\n按「取消」稍後再改')){appChangePass()}},2000)}}
+function finishLogin(acct){curAcct=acct;if(document.getElementById('app-remember').checked){localStorage.setItem('hm_app_session',JSON.stringify({user:acct.user,pass:acct._plain||acct.pass}))}document.getElementById('login-screen').style.display='none';checkMgrRole();loadData();if(verifyPass(acct.user+'aa',acct.pass)){setTimeout(function(){if(confirm('⚠ 您目前使用預設密碼\n\n為保護帳號安全，建議立即修改密碼。\n\n按「確定」立即修改\n按「取消」稍後再改')){appChangePass()}},2000)}}
 
 function showErr(msg){var el=document.getElementById('app-err');el.textContent=msg;el.style.display='block'}
 function appLogout(){curAcct=null;curEmp=null;localStorage.removeItem('hm_app_session');document.getElementById('login-screen').style.display='flex';document.getElementById('app-user').value='';document.getElementById('app-pass').value='';document.getElementById('app-err').style.display='none'}
 
-function loadData(){if(!db){renderAll();return}db.collection(fbEnv+'_employees').get().then(function(s){var n=[];s.forEach(function(d){n.push(Object.assign({id:d.id},d.data()))});if(n.length)staff=n;findCurEmp();renderAll()}).catch(function(){findCurEmp();renderAll()});db.collection(fbEnv+'_schedules').doc((viewY+1911)+'-'+pad(viewM)).get().then(function(d){if(d.exists)sched=d.data().data||{}}).catch(function(){});db.collection(fbEnv+'_hrdata').doc('leave').get().then(function(d){if(d.exists&&d.data().leaveRecords)leaveRecords=d.data().leaveRecords}).catch(function(){});db.collection(fbEnv+'_hrdata').doc('payHistory').get().then(function(d){if(d.exists&&d.data().data)payHistory=d.data().data}).catch(function(){})}
+function loadData(){if(!db){renderAll();return}db.collection(fbEnv+'_employees').get().then(function(s){var n=[];s.forEach(function(d){n.push(Object.assign({id:d.id},d.data()))});if(n.length)staff=n;findCurEmp();renderAll();onDataReady()}).catch(function(){findCurEmp();renderAll();onDataReady()});db.collection(fbEnv+'_schedules').doc((viewY+1911)+'-'+pad(viewM)).get().then(function(d){if(d.exists)sched=d.data().data||{}}).catch(function(){});db.collection(fbEnv+'_hrdata').doc('leave').get().then(function(d){if(d.exists&&d.data().leaveRecords)leaveRecords=d.data().leaveRecords}).catch(function(){});db.collection(fbEnv+'_hrdata').doc('payHistory').get().then(function(d){if(d.exists&&d.data().data)payHistory=d.data().data}).catch(function(){})}
 
 function findCurEmp(){if(curAcct&&curAcct.empId){curEmp=staff.find(function(e){return e.id===curAcct.empId})}if(!curEmp&&staff.length){curEmp=staff[0]}}
 
@@ -728,7 +728,7 @@ function loadMgrReport(){
 
 
 function getDeviceId(){var id=localStorage.getItem('hm_device_id');if(!id){id='dev_'+Date.now()+'_'+Math.random().toString(36).substring(2,8);localStorage.setItem('hm_device_id',id)}return id}
-function checkDeviceBind(){if(!curEmp||!db)return;var devId=getDeviceId();if(!curEmp.boundDevice){curEmp.boundDevice=devId;db.collection(fbEnv+'_employees').doc(curEmp.id).update({boundDevice:devId}).catch(function(){});console.log('Device bound: '+devId);return}if(curEmp.boundDevice!==devId){alert('⚠ 此帳號已綁定其他裝置\n\n如需更換裝置，請聯繫店長或老闆解除綁定');appLogout();return}}
+function checkDeviceBind(){if(!curEmp)return;var devId=getDeviceId();if(!curEmp.boundDevice||curEmp.boundDevice===''){curEmp.boundDevice=devId;db.collection(fbEnv+'_employees').doc(curEmp.id).update({boundDevice:devId}).catch(function(){});console.log('Device bound: '+devId);return}if(curEmp.boundDevice!==devId){alert('⚠ 此帳號已綁定其他裝置\n\n如需更換裝置，請聯繫店長或老闆解除綁定');appLogout();return}}
 
 
 var schedViewMode='my';
@@ -906,6 +906,20 @@ function renderProdWeekView(){
   document.getElementById('prod-week-view').innerHTML=h;
 }
 function getAppWeekStr(d){var jan1=new Date(d.getFullYear(),0,1);var days=Math.floor((d-jan1)/(86400000));var wn=Math.ceil((days+jan1.getDay()+1)/7);return d.getFullYear()+'-W'+String(wn).padStart(2,'0')}
+
+
+function onDataReady(){
+  checkDeviceBind();
+  loadEmpStats();
+  loadStoreNotes();
+  loadProdSchedule();
+  showProdHomeRemind();
+  loadPayNotify();
+  loadAppSurvey();
+  checkPreLeaveReminder();
+  renderOTChoices();
+  syncOfflinePunches();
+}
 
 // Init
 localStorage.setItem('hm_app_fb',JSON.stringify(_DEFAULT_FB));initFb();
