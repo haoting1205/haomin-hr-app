@@ -436,7 +436,36 @@ function initPunchScreen(){var ps=document.getElementById('p-store');if(ps&&curE
 function updateClock(){var n=new Date();document.getElementById('p-clock').textContent=pad(n.getHours())+':'+pad(n.getMinutes())+':'+pad(n.getSeconds());document.getElementById('p-date').textContent=n.getFullYear()+'/'+pad(n.getMonth()+1)+'/'+pad(n.getDate())+' ('+DOW[n.getDay()]+')';}
 
 var _lat=null,_lng=null;
-function getGPS(){var el=document.getElementById('p-gps');_lat=null;_lng=null;if(!navigator.geolocation){el.textContent='📍 不支援GPS，無法打卡';el.style.color='#991b1b';return}el.textContent='📍 定位中...';navigator.geolocation.getCurrentPosition(function(pos){_lat=pos.coords.latitude;_lng=pos.coords.longitude;var selStore=document.getElementById('p-store');var sh=selStore?storeHours[selStore.value]:null;if(sh&&sh.lat){var d=gpsDist(_lat,_lng,sh.lat,sh.lng);var ok=d<=(sh.radius||200);el.innerHTML='📍 '+(ok?'<span style="color:#166534">✅ 門市範圍內 ('+Math.round(d)+'m)</span>':'<span style="color:#991b1b">⚠ 不在門市範圍 ('+Math.round(d)+'m)</span>');el.style.background=ok?'#dcfce7':'#fee2e2'}else{el.textContent='📍 '+_lat.toFixed(5)+', '+_lng.toFixed(5)}},function(){el.textContent='📍 無法定位，請開啟定位功能才能打卡';el.style.color='#991b1b';el.style.background='#fee2e2'},{enableHighAccuracy:true,timeout:10000})}
+function getGPS(){
+  var el=document.getElementById('p-gps');
+  _lat=null;_lng=null;
+  if(!navigator.geolocation){el.textContent='📍 不支援GPS，無法打卡';el.style.color='#991b1b';return}
+  el.innerHTML='📍 定位中... <span style="font-size:10px;color:#666">(請確認瀏覽器已允許定位)</span>';
+  function onSuccess(pos){
+    _lat=pos.coords.latitude;_lng=pos.coords.longitude;
+    var selStore=document.getElementById('p-store');
+    var sh=selStore?storeHours[selStore.value]:null;
+    if(sh&&sh.lat){
+      var d=gpsDist(_lat,_lng,sh.lat,sh.lng);
+      var ok=d<=(sh.radius||200);
+      el.innerHTML='📍 '+(ok?'<span style="color:#166534">✅ 門市範圍內 ('+Math.round(d)+'m)</span>':'<span style="color:#991b1b">⚠ 不在門市範圍 ('+Math.round(d)+'m)</span>');
+      el.style.background=ok?'#dcfce7':'#fee2e2';
+    }else{
+      el.textContent='📍 '+_lat.toFixed(5)+', '+_lng.toFixed(5);
+    }
+  }
+  function onFail(err){
+    if(err.code===1){
+      el.innerHTML='📍 <span style="color:#991b1b">定位被拒絕</span><br><span style="font-size:11px;color:#666">請到手機設定 → 瀏覽器 → 允許定位權限</span><br><button onclick="getGPS()" style="margin-top:4px;padding:4px 12px;background:#2563eb;color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer">🔄 重試</button>';
+    }else{
+      el.innerHTML='📍 <span style="color:#92400e">定位中（第二次嘗試...）</span>';
+      navigator.geolocation.getCurrentPosition(onSuccess,function(){
+        el.innerHTML='📍 <span style="color:#991b1b">無法定位</span><br><span style="font-size:11px;color:#666">請確認：①手機定位已開啟 ②瀏覽器有定位權限 ③非飛航模式</span><br><button onclick="getGPS()" style="margin-top:4px;padding:4px 12px;background:#2563eb;color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer">🔄 重試</button>';
+      },{enableHighAccuracy:false,timeout:15000,maximumAge:30000});
+    }
+  }
+  navigator.geolocation.getCurrentPosition(onSuccess,onFail,{enableHighAccuracy:true,timeout:10000,maximumAge:0});
+}
 
 function gpsDist(a,b,c,d){var R=6371000,dL=(c-a)*Math.PI/180,dN=(d-b)*Math.PI/180,x=Math.sin(dL/2)*Math.sin(dL/2)+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dN/2)*Math.sin(dN/2);return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x))}
 
@@ -507,12 +536,12 @@ function renderPreLeave(){if(!curAcct)return;var now=new Date();var nextM=now.ge
 var existing=null;if(db){db.collection(fbEnv+'_hrdata').doc('preLeave').get().then(function(doc){var data=doc.exists?doc.data().data||[]:[];existing=data.find(function(p){return p.eid===curEmp.id&&p.month===mk});renderPreLeaveUI(nextY,nextM,mk,isOpen,existing,statusEl,calEl,selEl,actEl)}).catch(function(){renderPreLeaveUI(nextY,nextM,mk,isOpen,null,statusEl,calEl,selEl,actEl)})}else{renderPreLeaveUI(nextY,nextM,mk,isOpen,null,statusEl,calEl,selEl,actEl)}}
 function renderPreLeaveUI(yr,mon,mk,isOpen,existing,statusEl,calEl,selEl,actEl){if(existing){var stColor=existing.status==='已核准'?'#166534':existing.status==='已拒絕'?'#991b1b':'#92400e';var stBg=existing.status==='已核准'?'#dcfce7':existing.status==='已拒絕'?'#fee2e2':'#fef3c7';statusEl.innerHTML='<div style="padding:12px;background:'+stBg+';border-radius:10px;margin-bottom:8px"><div style="font-size:14px;font-weight:700;color:'+stColor+'">'+existing.status+'</div><div style="font-size:12px;color:#666;margin-top:4px">休假日：'+existing.dates.join(', ')+'</div>'+(existing.rejectReason?'<div style="font-size:12px;color:#991b1b;margin-top:4px">原因：'+existing.rejectReason+'</div>':'')+'</div>';calEl.innerHTML='';selEl.innerHTML='';actEl.innerHTML=existing.status==='已拒絕'?'<button class="btn btn-blue" onclick="resetPreLeave()">重新申請</button>':'';return}
 if(!isOpen){statusEl.innerHTML='<div style="padding:16px;background:#fee2e2;border-radius:10px;text-align:center"><div style="font-size:14px;font-weight:700;color:#991b1b">已超過截止日</div><div style="font-size:12px;color:#666;margin-top:4px">劃休截止日為每月10日，請下月再申請</div></div>';calEl.innerHTML='';selEl.innerHTML='';actEl.innerHTML='';return}
-statusEl.innerHTML='<div style="padding:10px;background:#dbeafe;border-radius:10px;font-size:12px;color:#1e40af;font-weight:700">請選擇 '+yr+'年'+mon+'月 想休假的日期（最多4天）</div>';
+statusEl.innerHTML='<div style="padding:10px;background:#dbeafe;border-radius:10px;font-size:12px;color:#1e40af;font-weight:700;margin-bottom:8px">請選擇 '+yr+'年'+mon+'月 想休假的日期（最多4天）</div><div style="margin-bottom:8px"><span style="font-size:11px;color:#666">劃休門市</span><select id="preleave-store" style="width:100%;padding:8px;border:2px solid #e8eaf0;border-radius:8px;font-size:14px;margin-top:4px"><option>'+(curEmp.store||'總公司')+'</option>'+(curEmp.store!=='總公司'?'<option>總公司</option>':'')+(curEmp.store!=='交大店'?'<option>交大店</option>':'')+(curEmp.store!=='台積電店'?'<option>台積電店</option>':'')+'<option>其他</option></select></div>';
 var daysInMonth=new Date(yr,mon,0).getDate();var firstDay=new Date(yr,mon-1,1).getDay();var cal='<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center">';['日','一','二','三','四','五','六'].forEach(function(d){cal+='<div style="font-size:11px;font-weight:700;color:#666;padding:6px 0">'+d+'</div>'});for(var i=0;i<firstDay;i++)cal+='<div></div>';for(var d=1;d<=daysInMonth;d++){var dateStr=yr+'-'+String(mon).padStart(2,'0')+'-'+String(d).padStart(2,'0');var dow=new Date(yr,mon-1,d).getDay();var isSel=preLeaveSelected.indexOf(dateStr)>=0;var bg=isSel?'#2563eb':'#f8fafc';var clr=isSel?'#fff':dow===0||dow===6?'#dc2626':'#222';cal+='<div onclick="togglePreLeaveDate(this,\''+dateStr+'\')" style="padding:8px 4px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:700;background:'+bg+';color:'+clr+';border:2px solid '+(isSel?'#1d4ed8':'transparent')+'">'+d+'</div>'}cal+='</div>';calEl.innerHTML=cal;
 updatePreLeaveSelected(selEl,actEl)}
 function togglePreLeaveDate(el,dateStr){var idx=preLeaveSelected.indexOf(dateStr);if(idx>=0){preLeaveSelected.splice(idx,1)}else{if(preLeaveSelected.length>=4){alert('最多選擇4天');return}preLeaveSelected.push(dateStr)}renderPreLeave()}
 function updatePreLeaveSelected(selEl,actEl){if(preLeaveSelected.length>0){selEl.innerHTML='<div style="font-size:13px;font-weight:700;color:#0f1b35;margin-bottom:6px">已選擇 '+preLeaveSelected.length+'/4 天</div><div style="display:flex;flex-wrap:wrap;gap:4px">'+preLeaveSelected.sort().map(function(d){return'<span style="padding:4px 10px;background:#dbeafe;border-radius:6px;font-size:12px;font-weight:700;color:#1e40af">'+d.substring(5)+'</span>'}).join('')+'</div>';actEl.innerHTML='<button class="btn btn-blue" onclick="submitPreLeave()" style="width:100%;margin-top:8px;padding:12px;font-size:15px">📤 提交劃休申請</button>'}else{selEl.innerHTML='';actEl.innerHTML=''}}
-function submitPreLeave(){if(preLeaveSelected.length===0){alert('請先選擇休假日期');return}if(!curEmp||!db){alert('請先登入並連線');return}var now=new Date();var nextM=now.getMonth()+2;var nextY=now.getFullYear();if(nextM>12){nextM=1;nextY++}var mk=nextY+'-'+String(nextM).padStart(2,'0');var newPL={id:'pl'+Date.now(),eid:curEmp.id,name:curEmp.name,store:curEmp.store||'',month:mk,dates:preLeaveSelected.sort(),status:'待審核',submitDate:now.toISOString()};db.collection(fbEnv+'_hrdata').doc('preLeave').get().then(function(doc){var data=doc.exists?doc.data().data||[]:[];data.push(newPL);db.collection(fbEnv+'_hrdata').doc('preLeave').set({data:data}).then(function(){preLeaveSelected=[];alert('✅ 劃休申請已提交\n\n'+mk+' 休假：'+newPL.dates.join(', ')+'\n\n請等待店長審核');renderPreLeave()}).catch(function(e){alert('提交失敗：'+e.message)})}).catch(function(e){alert('連線失敗：'+e.message)})}
+function submitPreLeave(){if(preLeaveSelected.length===0){alert('請先選擇休假日期');return}if(!curEmp||!db){alert('請先登入並連線');return}var now=new Date();var nextM=now.getMonth()+2;var nextY=now.getFullYear();if(nextM>12){nextM=1;nextY++}var mk=nextY+'-'+String(nextM).padStart(2,'0');var plStore=document.getElementById('preleave-store');var newPL={id:'pl'+Date.now(),eid:curEmp.id,name:curEmp.name,store:plStore?plStore.value:(curEmp.store||''),month:mk,dates:preLeaveSelected.sort(),status:'待審核',submitDate:now.toISOString()};db.collection(fbEnv+'_hrdata').doc('preLeave').get().then(function(doc){var data=doc.exists?doc.data().data||[]:[];data.push(newPL);db.collection(fbEnv+'_hrdata').doc('preLeave').set({data:data}).then(function(){preLeaveSelected=[];alert('✅ 劃休申請已提交\n\n'+mk+' 休假：'+newPL.dates.join(', ')+'\n\n請等待店長審核');renderPreLeave()}).catch(function(e){alert('提交失敗：'+e.message)})}).catch(function(e){alert('連線失敗：'+e.message)})}
 function resetPreLeave(){if(!curEmp||!db)return;var now=new Date();var nextM=now.getMonth()+2;var nextY=now.getFullYear();if(nextM>12){nextM=1;nextY++}var mk=nextY+'-'+String(nextM).padStart(2,'0');db.collection(fbEnv+'_hrdata').doc('preLeave').get().then(function(doc){var data=doc.exists?doc.data().data||[]:[];data=data.filter(function(p){return!(p.eid===curEmp.id&&p.month===mk)});db.collection(fbEnv+'_hrdata').doc('preLeave').set({data:data}).then(function(){preLeaveSelected=[];renderPreLeave()}).catch(function(e){alert('失敗：'+e.message)})})}
 
 
@@ -887,10 +916,10 @@ function renderProdToday(){
       h+='<div style="display:flex;align-items:center;gap:8px">';
       h+='<span style="font-size:12px;color:#666">產出：<b>'+item.output+' '+item.unit+'</b> (x'+item.multiplier+')</span>';
       if(rpt){
-        h+='<span style="font-size:12px;color:#166534;font-weight:700">✅ 已回報：'+(rpt.batch?'['+rpt.batch+'] ':'')+rpt.actual+' '+(rpt.unit||item.unit)+'</span>';
+        h+='<span style="font-size:12px;color:#166534;font-weight:700">✅ 已回報：'+(rpt.batch?'['+rpt.batch+'] ':'')+rpt.actual+' '+(rpt.unit||item.unit)+(rpt.extraG?' + '+rpt.extraG+'g':'')+'</span> <button id="prod-edit-today-'+ii+'" style="padding:2px 8px;background:#dbeafe;color:#1e40af;border:none;border-radius:4px;font-size:10px;cursor:pointer">✏修改</button>';
         h+='<span style="font-size:10px;color:#999">'+rpt.time+'</span>';
       }else if(item.status!=='已完成'){
-        h+='<div style="display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap"><input id="prod-batch-'+ii+'" placeholder="批號" style="width:90px;padding:6px;border:1px solid #ccc;border-radius:6px;font-size:12px;font-family:JetBrains Mono,monospace"><input type="number" step="0.01" id="prod-actual-'+ii+'" placeholder="數量" style="width:70px;padding:6px;border:1px solid #ccc;border-radius:6px;font-size:13px;text-align:center"><select id="prod-unit-'+ii+'" style="padding:6px;border:1px solid #ccc;border-radius:6px;font-size:12px"><option>'+item.unit+'</option>'+(item.unit!=='g'?'<option>g</option>':'')+'</select>';
+        h+='<div style="display:flex;align-items:center;gap:4px;margin-top:4px;flex-wrap:wrap"><input id="prod-batch-'+ii+'" placeholder="批號" style="width:80px;padding:6px;border:1px solid #ccc;border-radius:6px;font-size:12px;font-family:JetBrains Mono,monospace"><input type="number" id="prod-actual-'+ii+'" placeholder="整數" style="width:55px;padding:6px;border:1px solid #ccc;border-radius:6px;font-size:13px;text-align:center"><span style="font-size:12px">'+item.unit+'</span><span style="font-size:11px;color:#666">+</span><input type="number" id="prod-extra-'+ii+'" placeholder="0" style="width:50px;padding:6px;border:1px solid #ccc;border-radius:6px;font-size:13px;text-align:center"><span style="font-size:12px">g</span>';
         h+='<button id="prod-btn-'+ii+'" style="padding:6px 12px;background:#166534;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">📤 回報</button></div>';
       }else{
         h+='<span style="font-size:12px;color:#166534">✅ 已完成</span>';
@@ -905,6 +934,8 @@ function renderProdToday(){
   items.forEach(function(item2,ii2){
     var btn=document.getElementById('prod-btn-'+ii2);
     if(btn){(function(idx,itemId){btn.onclick=function(){reportProdItem(itemId,idx)}})(ii2,item2.id)}
+    var ebtn=document.getElementById('prod-edit-today-'+ii2);
+    if(ebtn){(function(it){ebtn.onclick=function(){editProdReport(it.id)}})(item2)}
   });
 }
 function reportProdItem(itemId,idx){
@@ -914,13 +945,15 @@ function reportProdItem(itemId,idx){
   var inp=document.getElementById('prod-actual-'+idx);
   if(!inp||!inp.value){alert('請輸入實際數量');return}
   var actual=+inp.value;
+  var extraInp=document.getElementById('prod-extra-'+idx);
+  var extraG=extraInp?+extraInp.value||0:0;
   var item=prodSchedule.find(function(s){return s.id===itemId});
   if(!item){alert('找不到排程');return}
   if(!prodReports[itemId])prodReports[itemId]={};
-  var rUnit=document.getElementById('prod-unit-'+idx);var unitVal=rUnit?rUnit.value:item.unit;prodReports[itemId][curEmp.id]={batch:batch,actual:actual,unit:unitVal,name:curEmp.name,time:new Date().toTimeString().substring(0,5),date:new Date().toISOString(),recipeName:item.recipeName};
+  var rUnit=document.getElementById('prod-unit-'+idx);var unitVal=rUnit?rUnit.value:item.unit;var unitVal=item.unit;prodReports[itemId][curEmp.id]={batch:batch,actual:actual,extraG:extraG,unit:unitVal,name:curEmp.name,time:new Date().toTimeString().substring(0,5),date:new Date().toISOString(),recipeName:item.recipeName};
   if(db){
     db.collection(fbEnv+'_hrdata').doc('prodReports').set({data:prodReports}).then(function(){
-      syncReportToERP(itemId,batch,actual,unitVal);
+      syncReportToERP(itemId,batch,actual,extraG,unitVal);
       alert('✅ 回報成功');
       renderProdToday();
     }).catch(function(e){alert('回報失敗：'+e.message)});
@@ -969,24 +1002,25 @@ function editProdReport(itemId){
   var item=prodSchedule.find(function(s){return s.id===itemId});
   var newBatch=prompt('批號：',rpt.batch||'');
   if(newBatch===null)return;
-  var newActual=prompt('實際數量：',rpt.actual);
+  var newActual=prompt('整數數量（'+item.unit+'）：',rpt.actual);
   if(newActual===null)return;
-  var newUnit=prompt('單位：',rpt.unit||item.unit);
-  if(newUnit===null)return;
+  var newExtraG=prompt('零頭克數（g，沒有填0）：',rpt.extraG||0);
+  if(newExtraG===null)return;
+  
   rpt.batch=newBatch;
   rpt.actual=+newActual;
-  rpt.unit=newUnit;
+  rpt.extraG=+newExtraG||0;
   rpt.editedAt=new Date().toISOString();
   if(db){
     db.collection(fbEnv+'_hrdata').doc('prodReports').set({data:prodReports}).then(function(){
-      syncReportToERP(itemId,newBatch,+newActual,newUnit);
+      syncReportToERP(itemId,newBatch,+newActual,rpt.extraG,rpt.unit||item.unit);
       alert('✅ 已修改');
       renderProdToday();renderProdWeekView();
     }).catch(function(e){alert('修改失敗：'+e.message)});
   }
 }
 
-function syncReportToERP(itemId,batch,actual,unit){
+function syncReportToERP(itemId,batch,actual,extraG,unit){
   if(!db)return;
   db.collection('erp').doc('state').get().then(function(doc){
     if(!doc.exists)return;
@@ -995,7 +1029,7 @@ function syncReportToERP(itemId,batch,actual,unit){
     var item=sched.find(function(s){return s.id===itemId});
     if(!item)return;
     if(!item.appReports)item.appReports=[];
-    item.appReports.push({eid:curEmp.id,name:curEmp.name,batch:batch,actual:actual,unit:unit,time:new Date().toISOString()});
+    item.appReports.push({eid:curEmp.id,name:curEmp.name,batch:batch,actual:actual,extraG:extraG,unit:unit,time:new Date().toISOString()});
     item.appActual=(item.appActual||0)+actual;
     db.collection('erp').doc('state').set(doc.data()).catch(function(){});
   }).catch(function(){});
