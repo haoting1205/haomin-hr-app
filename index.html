@@ -80,9 +80,9 @@ body{font-family:'Noto Sans TC',sans-serif;background:#eef2f7;color:var(--gray6)
 <button onclick="showAppForgot()" style="margin-top:12px;background:none;border:none;color:#2563eb;font-size:13px;cursor:pointer;font-family:inherit;text-decoration:underline">忘記密碼？</button>
 <div id="app-forgot" style="display:none;margin-top:14px;text-align:left;background:var(--gray1);border-radius:10px;padding:16px">
 <div style="font-size:14px;font-weight:700;color:#0f1b35;margin-bottom:8px">🔑 密碼重設</div>
-<div style="font-size:12px;color:#4b5680;margin-bottom:12px">請輸入您的帳號（工號），系統將重設密碼為預設值</div>
+<div style="font-size:12px;color:#4b5680;margin-bottom:12px">請輸入帳號（工號）+ 驗證資料，系統將重設密碼</div>
 <div class="form-group"><span class="fl">帳號（工號）</span><input class="fi" id="forgot-user" placeholder="如 hm0001"></div>
-<div class="form-group"><span class="fl">身分證字號（驗證身份）</span><input class="fi" id="forgot-id" placeholder="身分證字號"></div>
+<div class="form-group"><span class="fl">驗證資料（身分證/生日/手機）</span><input class="fi" id="forgot-id" placeholder="身分證字號 或 生日(1990-01-15) 或 手機"></div>
 <button class="btn btn-blue" onclick="doAppForgot()">確認重設密碼</button>
 <button class="btn btn-outline" style="font-size:13px;padding:8px" onclick="hideAppForgot()">返回登入</button>
 </div>
@@ -119,7 +119,7 @@ body{font-family:'Noto Sans TC',sans-serif;background:#eef2f7;color:var(--gray6)
 <div id="ot-choice-area"></div>
 <div id="app-pay-notify"></div>
 <div id="app-store-notes"></div>
-<div id="prod-home-remind"></div><button class="btn btn-green" onclick="switchScreen('punch')" style="font-size:18px;padding:20px">⏰ 立即打卡</button>
+<div id="health-home-remind"></div><div id="prod-home-remind"></div><button class="btn btn-green" onclick="switchScreen('punch')" style="font-size:18px;padding:20px">⏰ 立即打卡</button>
 <button class="btn btn-outline" onclick="switchScreen('sched')">📅 查看班表</button>
 <button class="btn btn-outline" onclick="switchScreen('leave')">📝 請假申請</button>
 </div>
@@ -391,11 +391,12 @@ body{font-family:'Noto Sans TC',sans-serif;background:#eef2f7;color:var(--gray6)
 <div class="tab-bar">
 <button class="tab-btn active" onclick="switchScreen('home')" id="tab-home"><span class="icon">🏠</span>首頁</button>
 <button class="tab-btn" onclick="switchScreen('punch')" id="tab-punch"><span class="icon">⏰</span>打卡</button>
+<button class="tab-btn prod-tab" onclick="switchScreen('prod')" id="tab-prod" style="display:none"><span class="icon">🏭</span>生產</button>
 <button class="tab-btn" onclick="switchScreen('sched')" id="tab-sched"><span class="icon">📅</span>班表</button>
+<button class="tab-btn" onclick="switchScreen('preleave')" id="tab-preleave"><span class="icon">🗓</span>劃休</button>
 <button class="tab-btn" onclick="switchScreen('leave')" id="tab-leave"><span class="icon">📝</span>請假</button>
 <button class="tab-btn" onclick="switchScreen('pay')" id="tab-pay"><span class="icon">💰</span>薪資</button>
-<button class="tab-btn" onclick="switchScreen('preleave')" id="tab-preleave"><span class="icon">🗓</span>劃休</button>
-<button class="tab-btn prod-tab" onclick="switchScreen('prod')" id="tab-prod" style="display:none"><span class="icon">🏭</span>生產</button><button class="tab-btn" onclick="switchScreen('me')" id="tab-me"><span class="icon">👤</span>我的</button><button class="tab-btn mgr-tab" onclick="switchScreen('approve')" id="tab-approve" style="display:none"><span class="icon">📋</span>審核</button><button class="tab-btn mgr-tab" onclick="switchScreen('attend')" id="tab-attend" style="display:none"><span class="icon">📊</span>出勤</button><button class="tab-btn mgr-tab" onclick="switchScreen('report')" id="tab-report" style="display:none"><span class="icon">📈</span>報表</button>
+<button class="tab-btn" onclick="switchScreen('me')" id="tab-me"><span class="icon">👤</span>我的</button><button class="tab-btn mgr-tab" onclick="switchScreen('approve')" id="tab-approve" style="display:none"><span class="icon">📋</span>審核</button><button class="tab-btn mgr-tab" onclick="switchScreen('attend')" id="tab-attend" style="display:none"><span class="icon">📊</span>出勤</button><button class="tab-btn mgr-tab" onclick="switchScreen('report')" id="tab-report" style="display:none"><span class="icon">📈</span>報表</button>
 </div>
 
 <script>
@@ -453,11 +454,52 @@ function renderLeave(){if(!curEmp){return}var myLeaves=leaveRecords.filter(funct
 
 function renderPay(){if(!curEmp){return}var months=Object.keys(payHistory).sort().reverse();var h='';if(!months.length)h='<div style="text-align:center;padding:20px;color:var(--gray4)">尚無薪資紀錄<br><span style="font-size:12px">薪資由管理端每月存檔後顯示</span></div>';months.forEach(function(mk){var rec=payHistory[mk][curEmp.id];if(!rec)return;h+='<div class="list-item"><div style="flex:1"><div style="font-weight:700;font-size:14px">'+mk+'</div><div style="font-size:12px;color:var(--gray4)">出勤 '+rec.workDays+'天</div></div><div style="text-align:right"><div style="font-family:JetBrains Mono,monospace;font-weight:700;font-size:16px;color:#166534">'+fNT(rec.netPay)+'</div><div style="font-size:11px;color:var(--gray4)">應發 '+fNT(rec.gross)+'</div></div></div>'});document.getElementById('pay-list').innerHTML=h}
 
-function renderMe(){if(!curEmp)return;var e=curEmp;var h='';var fields=[['姓名',e.name],['職稱',e.role],['門市',e.store],['到職日',e.hire_date],['電話',e.phone],['Email',e.email],['地址',e.address]];fields.forEach(function(f){h+='<div style="display:flex;padding:10px 0;border-bottom:1px solid var(--gray1)"><span style="min-width:70px;font-size:13px;color:var(--gray4)">'+f[0]+'</span><span style="font-size:14px;font-weight:600">'+(f[1]||'─')+'</span></div>'});document.getElementById('me-info').innerHTML=h}
+function renderMe(){if(!curEmp)return;var e=curEmp;var h='';var hexpStr='';
+  if(e.health_expiry){
+    var hexp=new Date(e.health_expiry);
+    var now2=new Date();
+    var diff=Math.ceil((hexp-now2)/(86400000));
+    if(diff<0)hexpStr=e.health_expiry+' ⚠ 已過期';
+    else if(diff<30)hexpStr=e.health_expiry+' ⚠ '+diff+'天內到期';
+    else if(diff<90)hexpStr=e.health_expiry+' ('+diff+'天後到期)';
+    else hexpStr=e.health_expiry;
+  }else{hexpStr='未填寫'}
+  var fields=[['姓名',e.name],['職稱',e.role],['門市',e.store],['到職日',e.hire_date],['體檢到期',hexpStr],['電話',e.phone],['Email',e.email],['地址',e.address]];fields.forEach(function(f){h+='<div style="display:flex;padding:10px 0;border-bottom:1px solid var(--gray1)"><span style="min-width:70px;font-size:13px;color:var(--gray4)">'+f[0]+'</span><span style="font-size:14px;font-weight:600">'+(f[1]||'─')+'</span></div>'});document.getElementById('me-info').innerHTML=h}
 
 function showAppForgot(){document.getElementById('app-forgot').style.display='block';document.getElementById('app-err').style.display='none'}
 function hideAppForgot(){document.getElementById('app-forgot').style.display='none';document.getElementById('forgot-user').value='';document.getElementById('forgot-id').value=''}
-function doAppForgot(){var user=document.getElementById('forgot-user').value.trim().toLowerCase();var idNum=document.getElementById('forgot-id').value.trim();if(!user||!idNum){alert('請填寫帳號和身分證字號');return}if(!db){alert('無法連線，請稍後再試');return}db.collection(fbEnv+'_hrdata').doc('accounts').get().then(function(doc){if(!doc.exists){alert('系統錯誤');return}var data=doc.data();var accounts=data.userAccounts||[];var acct=accounts.find(function(a){return a.user.toLowerCase()===user});if(!acct){alert('查無此帳號');return}if(!acct.empId){alert('此帳號未綁定員工，請聯繫管理員');return}db.collection(fbEnv+'_employees').get().then(function(s){var emp=null;s.forEach(function(d2){var e=Object.assign({id:d2.id},d2.data());if(e.id===acct.empId)emp=e});if(!emp){alert('查無員工資料，請聯繫管理員');return}if(emp.id_num!==idNum){alert('身分證字號驗證失敗');return}var newPass=user+'aa';acct.pass=hashPass(newPass);db.collection(fbEnv+'_hrdata').doc('accounts').set({userAccounts:accounts}).then(function(){alert('✅ 密碼已重設\n\n帳號：'+user+'\n新密碼：'+newPass+'\n\n請登入後立即修改密碼');hideAppForgot()}).catch(function(e){alert('重設失敗：'+e.message)})}).catch(function(e){alert('驗證失敗：'+e.message)})}).catch(function(e){alert('連線失敗：'+e.message)})}
+function doAppForgot(){
+  try{
+    var user=document.getElementById('forgot-user').value.trim().toLowerCase();
+    var idNum=document.getElementById('forgot-id').value.trim();
+    if(!user||!idNum){alert('請填寫帳號和驗證資料');return}
+    if(!db){alert('無法連線，請稍後再試');return}
+    db.collection(fbEnv+'_hrdata').doc('accounts').get().then(function(doc){
+      if(!doc.exists){alert('系統錯誤，請聯繫管理員');return}
+      var accounts=doc.data().userAccounts||[];
+      var acct=accounts.find(function(a){return a.user.toLowerCase()===user});
+      if(!acct){alert('查無此帳號「'+user+'」\n請確認是否輸入正確的工號');return}
+      if(!acct.empId){alert('此帳號未綁定員工，請聯繫管理員');return}
+      db.collection(fbEnv+'_employees').doc(acct.empId).get().then(function(d2){
+        if(!d2.exists){alert('查無員工資料，請聯繫管理員');return}
+        var emp=Object.assign({id:d2.id},d2.data());
+        var verified=false;
+        if(emp.id_num&&emp.id_num===idNum)verified=true;
+        if(!verified&&emp.birth&&emp.birth===idNum)verified=true;
+        if(!verified&&emp.phone&&emp.phone===idNum)verified=true;
+        if(!verified){alert('驗證失敗\n\n請輸入以下任一項：\n• 身分證字號\n• 出生日期（如 1990-01-15）\n• 手機號碼\n\n若仍無法重設，請聯繫店長或老闆');return}
+        var newPass=user+'aa';
+        acct.pass=hashPass(newPass);
+        emp.boundDevice='';
+        db.collection(fbEnv+'_employees').doc(emp.id).update({boundDevice:''}).catch(function(){});
+        db.collection(fbEnv+'_hrdata').doc('accounts').set({userAccounts:accounts}).then(function(){
+          alert('✅ 密碼已重設\n\n帳號：'+user+'\n新密碼：'+newPass+'\n\n登入後請至「👤 我的」修改密碼');
+          hideAppForgot();
+        }).catch(function(e){alert('重設失敗：'+e.message)});
+      }).catch(function(e){alert('查詢失敗：'+e.message)});
+    }).catch(function(e){alert('連線失敗：'+e.message)});
+  }catch(e){alert('系統錯誤：'+e.message)}
+}
 function appChangePass(){if(!curAcct){alert('請先登入');return}var oldP=prompt('請輸入目前密碼：');if(!oldP)return;if(!verifyPass(oldP,curAcct.pass)){alert('密碼錯誤');return}var newP=prompt('請輸入新密碼（8~16字元，英文+數字）：');if(!newP)return;if(newP.length<8||newP.length>16){alert('密碼長度需8~16字元');return}if(!/[a-zA-Z]/.test(newP)||!/[0-9]/.test(newP)){alert('密碼需同時包含英文和數字');return}var confirmP=prompt('請再次輸入新密碼確認：');if(confirmP!==newP){alert('兩次輸入不一致');return}if(db){db.collection(fbEnv+'_hrdata').doc('accounts').get().then(function(doc){if(!doc.exists)return;var data=doc.data();var accounts=data.userAccounts||[];var acct=accounts.find(function(a){return a.user===curAcct.user});if(acct){acct.pass=hashPass(newP);db.collection(fbEnv+'_hrdata').doc('accounts').set({userAccounts:accounts});curAcct.pass=hashPass(newP);if(document.getElementById('app-remember').checked){localStorage.setItem('hm_app_session',JSON.stringify({user:curAcct.user,pass:newP}))}alert('✅ 密碼已修改成功')}}).catch(function(e){alert('修改失敗：'+e.message)})}else{alert('請連線後再修改密碼')}}
 
 var preLeaveSelected=[];
@@ -474,7 +516,7 @@ function submitPreLeave(){if(preLeaveSelected.length===0){alert('請先選擇休
 function resetPreLeave(){if(!curEmp||!db)return;var now=new Date();var nextM=now.getMonth()+2;var nextY=now.getFullYear();if(nextM>12){nextM=1;nextY++}var mk=nextY+'-'+String(nextM).padStart(2,'0');db.collection(fbEnv+'_hrdata').doc('preLeave').get().then(function(doc){var data=doc.exists?doc.data().data||[]:[];data=data.filter(function(p){return!(p.eid===curEmp.id&&p.month===mk)});db.collection(fbEnv+'_hrdata').doc('preLeave').set({data:data}).then(function(){preLeaveSelected=[];renderPreLeave()}).catch(function(e){alert('失敗：'+e.message)})})}
 
 
-function checkPreLeaveReminder(){if(!curEmp||!db)return;var now=new Date();if(now.getDate()>10)return;var nextM=now.getMonth()+2;var nextY=now.getFullYear();if(nextM>12){nextM=1;nextY++}var mk=nextY+'-'+String(nextM).padStart(2,'0');db.collection(fbEnv+'_hrdata').doc('preLeave').get().then(function(doc){var data=doc.exists?doc.data().data||[]:[];var mine=data.find(function(p){return p.eid===curEmp.id&&p.month===mk});if(!mine){var daysLeft=10-now.getDate();var el=document.getElementById('preleave-remind');if(el)el.innerHTML='<div onclick="switchScreen(\'preleave\')" style="padding:14px;background:linear-gradient(135deg,#fef3c7,#fffbeb);border:2px solid #f59e0b;border-radius:12px;margin-bottom:14px;cursor:pointer"><div style="font-size:14px;font-weight:700;color:#92400e">🗓 劃休提醒</div><div style="font-size:12px;color:#92400e;margin-top:4px">'+mk+' 尚未提交劃休申請</div><div style="font-size:12px;color:#b45309;margin-top:2px">截止日剩 <b>'+daysLeft+'</b> 天，請盡快提交 →</div></div>'}}).catch(function(){})}
+function checkPreLeaveReminder(){if(!curEmp||!db)return;var now=new Date();if(now.getDate()>10)return;var nextM=now.getMonth()+2;var nextY=now.getFullYear();if(nextM>12){nextM=1;nextY++}var mk=nextY+'-'+String(nextM).padStart(2,'0');db.collection(fbEnv+'_hrdata').doc('preLeave').get().then(function(doc){var data=doc.exists?doc.data().data||[]:[];var mine=data.find(function(p){return p.eid===curEmp.id&&p.month===mk});if(!mine){var daysLeft=10-now.getDate();var el=document.getElementById('preleave-remind');if(el)el.innerHTML='<div onclick="switchScreen(\'preleave\')" style="padding:14px;background:linear-gradient(135deg,#fee2e2,#fff1f2);border:2px solid #dc2626;border-radius:12px;margin-bottom:14px;cursor:pointer"><div style="font-size:14px;font-weight:700;color:#991b1b">🗓 劃休提醒</div><div style="font-size:12px;color:#991b1b;margin-top:4px">'+mk+' 尚未提交劃休申請</div><div style="font-size:12px;color:#dc2626;margin-top:2px">截止日剩 <b>'+daysLeft+'</b> 天，請盡快提交 →</div></div>'}}).catch(function(){})}
 
 
 function appAutoLogin(sess){if(!db){appLogin();return}db.collection(fbEnv+'_hrdata').doc('accounts').get().then(function(doc){if(!doc.exists){appLogin();return}var accounts=doc.data().userAccounts||[];var acct=accounts.find(function(a){return a.user===sess.user&&verifyPass(sess.pass,a.pass)});if(acct){finishLogin(acct)}else{localStorage.removeItem('hm_app_session');document.getElementById('app-pass').value='';showErr('密碼已被管理端修改，請重新登入')}}).catch(function(){appLogin()})}
@@ -486,7 +528,7 @@ function appOTChoose(otId,choice){if(!db)return;var label=choice==='pay'?'💰 �
 
 function submitMakeupPunch(){if(!curEmp||!db)return;var date=document.getElementById('app-makeup-date').value;var time=document.getElementById('app-makeup-time').value;var type=document.getElementById('app-makeup-type').value;var reason=document.getElementById('app-makeup-reason').value;if(!date||!time||!reason){alert('請填寫完整（日期、時間、原因）');return}if(!confirm('確認提交補打卡申請？\n\n日期：'+date+'\n時間：'+time+'\n類型：'+type+'\n原因：'+reason))return;db.collection(fbEnv+'_hrdata').doc('punchApplies').get().then(function(doc){var data=doc.exists?doc.data().data||[]:[];data.push({id:'ma'+Date.now(),eid:curEmp.id,name:curEmp.name,store:curEmp.store||'',date:date,time:time+':00',type:type,reason:reason,status:'待審核',submitDate:new Date().toISOString()});db.collection(fbEnv+'_hrdata').doc('punchApplies').set({data:data}).then(function(){alert('✅ 補打卡申請已提交\n請等待店長審核');document.getElementById('app-makeup-reason').value='';loadMakeupHistory()}).catch(function(e){alert('提交失敗：'+e.message)})}).catch(function(e){alert('連線失敗：'+e.message)})}
 function loadMakeupHistory(){if(!curEmp||!db)return;db.collection(fbEnv+'_hrdata').doc('punchApplies').get().then(function(doc){var data=doc.exists?doc.data().data||[]:[];var mine=data.filter(function(r){return r.eid===curEmp.id}).sort(function(a,b){return a.date>b.date?-1:1}).slice(0,5);var el=document.getElementById('app-makeup-list');if(!el)return;if(mine.length===0){el.innerHTML='';return}var h='<div style="font-size:12px;font-weight:700;color:#666;margin-bottom:6px">近期申請</div>';mine.forEach(function(r){var stColor=r.status==='已核准'?'#166534':r.status==='已拒絕'?'#991b1b':'#92400e';var stBg=r.status==='已核准'?'#dcfce7':r.status==='已拒絕'?'#fee2e2':'#fef3c7';h+='<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;margin-bottom:3px;background:'+stBg+';border-radius:6px;font-size:11px"><span style="font-family:monospace;min-width:72px">'+r.date+'</span><span style="min-width:40px">'+r.time.substring(0,5)+'</span><span style="min-width:30px">'+r.type+'</span><span style="font-weight:700;color:'+stColor+'">'+r.status+'</span></div>'});el.innerHTML=h}).catch(function(){})}
-function loadStoreNotes(){if(!curEmp||!db)return;db.collection(fbEnv+'_hrdata').doc('storeNotes').get().then(function(doc){if(!doc.exists)return;var notes=doc.data().data||{};var store=curEmp.store||'總公司';var today=new Date().toISOString().substring(0,10);var noteKey=store+'_'+today;var note=notes[noteKey];var el=document.getElementById('app-store-notes');if(!el)return;if(!note||!note.content){el.innerHTML='';return}el.innerHTML='<div style="padding:14px;background:linear-gradient(135deg,#fef3c7,#fffbeb);border:2px solid #f59e0b;border-radius:12px;margin-bottom:10px"><div style="font-size:14px;font-weight:700;color:#92400e;margin-bottom:4px">📋 今日交接事項</div><div style="font-size:12px;color:#92400e;line-height:1.6">'+note.content.replace(/\n/g,'<br>')+'</div><div style="font-size:10px;color:#b45309;margin-top:6px">— '+note.by+' '+(note.time||'')+'</div></div>'}).catch(function(){})}
+function loadStoreNotes(){if(!curEmp||!db)return;db.collection(fbEnv+'_hrdata').doc('storeNotes').get().then(function(doc){if(!doc.exists)return;var notes=doc.data().data||{};var store=curEmp.store||'總公司';var today=new Date().toISOString().substring(0,10);var noteKey=store+'_'+today;var note=notes[noteKey];var el=document.getElementById('app-store-notes');if(!el)return;if(!note||!note.content){el.innerHTML='';return}el.innerHTML='<div style="padding:14px;background:linear-gradient(135deg,#fee2e2,#fff1f2);border:2px solid #dc2626;border-radius:12px;margin-bottom:10px"><div style="font-size:14px;font-weight:700;color:#92400e;margin-bottom:4px">📋 今日交接事項</div><div style="font-size:12px;color:#92400e;line-height:1.6">'+note.content.replace(/\n/g,'<br>')+'</div><div style="font-size:10px;color:#b45309;margin-top:6px">— '+note.by+' '+(note.time||'')+'</div></div>'}).catch(function(){})}
 
 
 function openAppSwap(){if(!curEmp||!db)return;var h='<div style="font-size:16px;font-weight:700;color:#0f1b35;margin-bottom:12px">🔄 換班申請</div>';h+='<div style="margin-bottom:8px"><span style="font-size:11px;color:#666">換班日期</span><input class="fi" type="date" id="app-swap-date"></div>';h+='<div style="margin-bottom:8px"><span style="font-size:11px;color:#666">想換的對象</span><select class="fi" id="app-swap-target">';staff.forEach(function(e){if(e.id!==curEmp.id&&!e.leave_date)h+='<option value="'+e.id+'">'+e.name+'</option>'});h+='</select></div>';h+='<div style="margin-bottom:8px"><span style="font-size:11px;color:#666">原因</span><input class="fi" id="app-swap-reason" placeholder="換班原因"></div>';h+='<button onclick="submitAppSwap()" style="width:100%;padding:10px;background:#7c3aed;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">📤 提交換班申請</button>';h+='<div id="app-swap-list" style="margin-top:12px"></div>';document.getElementById('screen-preleave').innerHTML='<div style="padding:16px">'+h+'</div>';loadAppSwapHistory()}
@@ -498,7 +540,7 @@ function loadPayNotify(){if(!curEmp||!db)return;db.collection(fbEnv+'_hrdata').d
 function markPayRead(nid){if(!db)return;db.collection(fbEnv+'_hrdata').doc('payNotifies').get().then(function(doc){var data=doc.exists?doc.data().data||[]:[];var n=data.find(function(x){return x.id===nid});if(n)n.read=true;db.collection(fbEnv+'_hrdata').doc('payNotifies').set({data:data}).then(function(){loadPayNotify()}).catch(function(){})}).catch(function(){})}
 
 
-function loadAppSurvey(){if(!curEmp||!db)return;db.collection(fbEnv+'_hrdata').doc('survey').get().then(function(doc){if(!doc.exists)return;var data=doc.data().data||[];var active=data.filter(function(s){return s.status==='進行中'&&!s.responses.find(function(r){return r.eid===curEmp.id})});var el=document.getElementById('app-survey-area');if(!el)return;if(active.length===0){el.innerHTML='';return}var h='';active.forEach(function(s){h+='<div style="padding:14px;background:linear-gradient(135deg,#ede9fe,#f5f3ff);border:2px solid #8b5cf6;border-radius:12px;margin-bottom:10px"><div style="font-size:14px;font-weight:700;color:#7c3aed;margin-bottom:8px">📝 '+s.title+'</div>';s.questions.forEach(function(q,qi){h+='<div style="margin-bottom:6px;font-size:12px"><div style="color:#333;margin-bottom:2px">'+q+'</div><div style="display:flex;gap:4px">';for(var sc=1;sc<=5;sc++){h+='<button onclick="this.parentNode.querySelectorAll(\'button\').forEach(function(b){b.style.background=\'#e5e7eb\'});this.style.background=\'#8b5cf6\';this.style.color=\'#fff\';this.dataset.val=\''+sc+'\'" data-q="'+qi+'" style="width:36px;height:28px;border:none;border-radius:4px;background:#e5e7eb;cursor:pointer;font-weight:700;font-size:12px">'+sc+'</button>'}h+='</div></div>'});h+='<button onclick="submitAppSurvey(\''+s.id+'\')" style="width:100%;padding:8px;background:#7c3aed;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;margin-top:4px">📤 匿名提交</button></div>'});el.innerHTML=h}).catch(function(){})}
+function loadAppSurvey(){if(!curEmp||!db)return;db.collection(fbEnv+'_hrdata').doc('survey').get().then(function(doc){if(!doc.exists)return;var data=doc.data().data||[];var active=data.filter(function(s){return s.status==='進行中'&&!s.responses.find(function(r){return r.eid===curEmp.id})});var el=document.getElementById('app-survey-area');if(!el)return;if(active.length===0){el.innerHTML='';return}var h='';active.forEach(function(s){h+='<div style="padding:14px;background:linear-gradient(135deg,#fee2e2,#fff5f5);border:2px solid #dc2626;border-radius:12px;margin-bottom:10px"><div style="font-size:14px;font-weight:700;color:#7c3aed;margin-bottom:8px">📝 '+s.title+'</div>';s.questions.forEach(function(q,qi){h+='<div style="margin-bottom:6px;font-size:12px"><div style="color:#333;margin-bottom:2px">'+q+'</div><div style="display:flex;gap:4px">';for(var sc=1;sc<=5;sc++){h+='<button onclick="this.parentNode.querySelectorAll(\'button\').forEach(function(b){b.style.background=\'#e5e7eb\'});this.style.background=\'#8b5cf6\';this.style.color=\'#fff\';this.dataset.val=\''+sc+'\'" data-q="'+qi+'" style="width:36px;height:28px;border:none;border-radius:4px;background:#e5e7eb;cursor:pointer;font-weight:700;font-size:12px">'+sc+'</button>'}h+='</div></div>'});h+='<button onclick="submitAppSurvey(\''+s.id+'\')" style="width:100%;padding:8px;background:#7c3aed;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;margin-top:4px">📤 匿名提交</button></div>'});el.innerHTML=h}).catch(function(){})}
 function submitAppSurvey(sid){if(!db)return;var scores=[];var buttons=document.querySelectorAll('[data-q]');var maxQ=0;buttons.forEach(function(b){var qi=+b.dataset.q;if(qi>maxQ)maxQ=qi;if(b.dataset.val)scores[qi]=+b.dataset.val});if(scores.filter(Boolean).length<maxQ+1){alert('請為每個項目評分');return}db.collection(fbEnv+'_hrdata').doc('survey').get().then(function(doc){var data=doc.exists?doc.data().data||[]:[];var s=data.find(function(x){return x.id===sid});if(!s)return;s.responses.push({eid:curEmp.id,scores:scores,date:new Date().toISOString()});db.collection(fbEnv+'_hrdata').doc('survey').set({data:data}).then(function(){alert('✅ 感謝您的回饋！（匿名提交）');loadAppSurvey()}).catch(function(e){alert('提交失敗')})}).catch(function(){})}
 
 
@@ -817,7 +859,7 @@ function showProdHomeRemind(){
   var el=document.getElementById('prod-home-remind');
   if(!el||items.length===0){if(el)el.innerHTML='';return}
   var done=items.filter(function(it){return(prodReports[it.id]&&prodReports[it.id][curEmp.id])||it.status==='已完成'}).length;
-  el.innerHTML='<div onclick="switchScreen(\'prod\')" style="padding:14px;background:linear-gradient(135deg,#ede9fe,#f5f3ff);border:2px solid #8b5cf6;border-radius:12px;margin-bottom:14px;cursor:pointer"><div style="font-size:14px;font-weight:700;color:#7c3aed">🏭 今日生產任務</div><div style="font-size:12px;color:#5b21b6;margin-top:4px">'+items.length+' 項品項，已完成 '+done+'/'+items.length+'</div><div style="font-size:12px;color:#7c3aed;margin-top:2px">點擊查看詳情 →</div></div>';
+  el.innerHTML='<div onclick="switchScreen(\'prod\')" style="padding:14px;background:linear-gradient(135deg,#fee2e2,#fff5f5);border:2px solid #dc2626;border-radius:12px;margin-bottom:14px;cursor:pointer"><div style="font-size:14px;font-weight:700;color:#991b1b">🏭 今日生產任務</div><div style="font-size:12px;color:#991b1b;margin-top:4px">'+items.length+' 項品項，已完成 '+done+'/'+items.length+'</div><div style="font-size:12px;color:#dc2626;margin-top:2px">點擊查看詳情 →</div></div>';
 }
 function checkShowProdTab(){
   var tab=document.getElementById('tab-prod');
@@ -845,11 +887,11 @@ function renderProdToday(){
       h+='<div style="display:flex;align-items:center;gap:8px">';
       h+='<span style="font-size:12px;color:#666">產出：<b>'+item.output+' '+item.unit+'</b> (x'+item.multiplier+')</span>';
       if(rpt){
-        h+='<span style="font-size:12px;color:#166534;font-weight:700">✅ 已回報：'+rpt.actual+' '+item.unit+'</span>';
+        h+='<span style="font-size:12px;color:#166534;font-weight:700">✅ 已回報：'+(rpt.batch?'['+rpt.batch+'] ':'')+rpt.actual+' '+(rpt.unit||item.unit)+'</span>';
         h+='<span style="font-size:10px;color:#999">'+rpt.time+'</span>';
       }else if(item.status!=='已完成'){
-        h+='<input type="number" id="prod-actual-'+ii+'" placeholder="實際數量" style="width:80px;padding:6px;border:1px solid #ccc;border-radius:6px;font-size:13px;text-align:center">';
-        h+='<button id="prod-btn-'+ii+'" style="padding:6px 12px;background:#166534;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">📤 回報</button>';
+        h+='<div style="display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap"><input id="prod-batch-'+ii+'" placeholder="批號" style="width:90px;padding:6px;border:1px solid #ccc;border-radius:6px;font-size:12px;font-family:JetBrains Mono,monospace"><input type="number" step="0.01" id="prod-actual-'+ii+'" placeholder="數量" style="width:70px;padding:6px;border:1px solid #ccc;border-radius:6px;font-size:13px;text-align:center"><select id="prod-unit-'+ii+'" style="padding:6px;border:1px solid #ccc;border-radius:6px;font-size:12px"><option>'+item.unit+'</option>'+(item.unit!=='g'?'<option>g</option>':'')+'</select>';
+        h+='<button id="prod-btn-'+ii+'" style="padding:6px 12px;background:#166534;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">📤 回報</button></div>';
       }else{
         h+='<span style="font-size:12px;color:#166534">✅ 已完成</span>';
       }
@@ -866,15 +908,19 @@ function renderProdToday(){
   });
 }
 function reportProdItem(itemId,idx){
+  var batchInp=document.getElementById('prod-batch-'+idx);
+  var batch=batchInp?batchInp.value.trim():'';
+  if(!batch){alert('請輸入批號');return}
   var inp=document.getElementById('prod-actual-'+idx);
   if(!inp||!inp.value){alert('請輸入實際數量');return}
   var actual=+inp.value;
   var item=prodSchedule.find(function(s){return s.id===itemId});
   if(!item){alert('找不到排程');return}
   if(!prodReports[itemId])prodReports[itemId]={};
-  prodReports[itemId][curEmp.id]={actual:actual,name:curEmp.name,time:new Date().toTimeString().substring(0,5),date:new Date().toISOString(),recipeName:item.recipeName};
+  var rUnit=document.getElementById('prod-unit-'+idx);var unitVal=rUnit?rUnit.value:item.unit;prodReports[itemId][curEmp.id]={batch:batch,actual:actual,unit:unitVal,name:curEmp.name,time:new Date().toTimeString().substring(0,5),date:new Date().toISOString(),recipeName:item.recipeName};
   if(db){
     db.collection(fbEnv+'_hrdata').doc('prodReports').set({data:prodReports}).then(function(){
+      syncReportToERP(itemId,batch,actual,unitVal);
       alert('✅ 回報成功');
       renderProdToday();
     }).catch(function(e){alert('回報失敗：'+e.message)});
@@ -898,18 +944,84 @@ function renderProdWeekView(){
       var rpt=prodReports[item.id];
       var done=rpt&&Object.keys(rpt).length>0;
       var stIcon=item.status==='已完成'?'✅':item.status==='生產中'?'🔵':'⬜';
-      h+='<div style="font-size:11px;color:'+(done||item.status==='已完成'?'#166534':'#333')+';padding:2px 0 2px 12px">'+stIcon+' '+item.recipeName+' x'+item.multiplier+' '+item.output+item.unit+'</div>';
+      var myRpt=prodReports[item.id]?prodReports[item.id][curEmp.id]:null;
+      h+='<div style="display:flex;align-items:center;gap:4px;font-size:11px;color:'+(done||item.status==='已完成'?'#166534':'#333')+';padding:2px 0 2px 12px">'+stIcon+' '+item.recipeName+' x'+item.multiplier+' '+item.output+item.unit;
+      if(myRpt){h+=' <span style="color:#166534;font-weight:700">['+myRpt.actual+(myRpt.unit||'')+']</span> <button id="prod-edit-'+item.id+'" style="padding:1px 6px;background:#dbeafe;color:#1e40af;border:none;border-radius:3px;font-size:10px;cursor:pointer">✏</button>'}
+      h+='</div>';
     });
     h+='</div>';
   });
   if(!hasAny)h='<div style="text-align:center;padding:16px;color:var(--gray4)">本週無排程</div>';
   document.getElementById('prod-week-view').innerHTML=h;
+  prodSchedule.forEach(function(item){
+    var btn=document.getElementById('prod-edit-'+item.id);
+    if(btn){(function(it){btn.onclick=function(){editProdReport(it.id)}})(item)}
+  });
 }
 function getAppWeekStr(d){var jan1=new Date(d.getFullYear(),0,1);var days=Math.floor((d-jan1)/(86400000));var wn=Math.ceil((days+jan1.getDay()+1)/7);return d.getFullYear()+'-W'+String(wn).padStart(2,'0')}
 
 
+
+
+function editProdReport(itemId){
+  var rpt=prodReports[itemId]?prodReports[itemId][curEmp.id]:null;
+  if(!rpt){alert('找不到回報紀錄');return}
+  var item=prodSchedule.find(function(s){return s.id===itemId});
+  var newBatch=prompt('批號：',rpt.batch||'');
+  if(newBatch===null)return;
+  var newActual=prompt('實際數量：',rpt.actual);
+  if(newActual===null)return;
+  var newUnit=prompt('單位：',rpt.unit||item.unit);
+  if(newUnit===null)return;
+  rpt.batch=newBatch;
+  rpt.actual=+newActual;
+  rpt.unit=newUnit;
+  rpt.editedAt=new Date().toISOString();
+  if(db){
+    db.collection(fbEnv+'_hrdata').doc('prodReports').set({data:prodReports}).then(function(){
+      syncReportToERP(itemId,newBatch,+newActual,newUnit);
+      alert('✅ 已修改');
+      renderProdToday();renderProdWeekView();
+    }).catch(function(e){alert('修改失敗：'+e.message)});
+  }
+}
+
+function syncReportToERP(itemId,batch,actual,unit){
+  if(!db)return;
+  db.collection('erp').doc('state').get().then(function(doc){
+    if(!doc.exists)return;
+    var data=doc.data().data||doc.data();
+    var sched=data.prodSchedule||[];
+    var item=sched.find(function(s){return s.id===itemId});
+    if(!item)return;
+    if(!item.appReports)item.appReports=[];
+    item.appReports.push({eid:curEmp.id,name:curEmp.name,batch:batch,actual:actual,unit:unit,time:new Date().toISOString()});
+    item.appActual=(item.appActual||0)+actual;
+    db.collection('erp').doc('state').set(doc.data()).catch(function(){});
+  }).catch(function(){});
+}
+
+
+function checkHealthReminder(){
+  if(!curEmp)return;
+  var el=document.getElementById('health-home-remind');
+  if(!el)return;
+  if(!curEmp.health_expiry){
+    var hire=curEmp.hire_date?new Date(curEmp.hire_date):null;
+    if(hire){var sixMo=new Date(hire);sixMo.setMonth(sixMo.getMonth()+6);if(new Date()>sixMo){el.innerHTML='<div style="padding:14px;background:linear-gradient(135deg,#fee2e2,#fff1f2);border:2px solid #dc2626;border-radius:12px;margin-bottom:14px"><div style="font-size:14px;font-weight:700;color:#991b1b">🏥 體檢提醒</div><div style="font-size:12px;color:#991b1b;margin-top:4px">到職已超過6個月，尚未提供體檢報告</div><div style="font-size:12px;color:#dc2626;margin-top:2px">請儘速完成體檢並繳交報告</div></div>';return}}
+    el.innerHTML='';return;
+  }
+  var exp=new Date(curEmp.health_expiry);
+  var now3=new Date();
+  var days=Math.ceil((exp-now3)/(86400000));
+  if(days>30){el.innerHTML='';return}
+  var msg=days<0?'體檢已過期 '+Math.abs(days)+' 天！請立即安排體檢':'體檢將在 '+days+' 天內到期（'+curEmp.health_expiry+'）';
+  el.innerHTML='<div style="padding:14px;background:linear-gradient(135deg,#fee2e2,#fff1f2);border:2px solid #dc2626;border-radius:12px;margin-bottom:14px"><div style="font-size:14px;font-weight:700;color:#991b1b">🏥 體檢'+(days<0?'已過期':'即將到期')+'</div><div style="font-size:12px;color:#991b1b;margin-top:4px">'+msg+'</div></div>';
+}
+
 function onDataReady(){
   checkDeviceBind();
+  checkHealthReminder();
   loadEmpStats();
   loadStoreNotes();
   loadProdSchedule();
