@@ -385,7 +385,7 @@ body{font-family:'Noto Sans TC',sans-serif;background:#eef2f7;color:var(--gray6)
 <div id="prod-today">載入中...</div>
 </div>
 <div class="card">
-<div class="card-title">📋 本週排程總覽</div>
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><button onclick="changeProdWeek(-1)" style="padding:4px 10px;background:var(--gray1);border:1px solid var(--gray2);border-radius:6px;font-size:12px;cursor:pointer">◀</button><div class="card-title" style="margin:0" id="prod-week-title">📋 本週排程總覽</div><button onclick="changeProdWeek(1)" style="padding:4px 10px;background:var(--gray1);border:1px solid var(--gray2);border-radius:6px;font-size:12px;cursor:pointer">▶</button></div>
 <div id="prod-week-view">載入中...</div>
 </div>
 </div>
@@ -866,7 +866,7 @@ function renderSchedStore(){
 }
 
 
-var prodSchedule=[];var prodReports={};
+var prodSchedule=[];var prodReports={};var prodWeekOffset=0;
 function loadProdSchedule(){
   if(!db)return;
   db.collection('erp').doc('state').get().then(function(doc){
@@ -964,10 +964,14 @@ function reportProdItem(itemId,idx){
     }).catch(function(e){alert('回報失敗：'+e.message)});
   }
 }
+
+function changeProdWeek(dir){prodWeekOffset+=dir;renderProdWeekView()}
 function renderProdWeekView(){
   var now=new Date();var today=now.toISOString().substring(0,10);
   var DOW3=['日','一','二','三','四','五','六'];
-  var weekStart=new Date(now);weekStart.setDate(weekStart.getDate()-weekStart.getDay()+1);
+  var weekStart=new Date(now);weekStart.setDate(weekStart.getDate()-weekStart.getDay()+1+(prodWeekOffset*7));
+  var titleEl=document.getElementById('prod-week-title');
+  if(titleEl)titleEl.textContent=prodWeekOffset===0?'📋 本週排程總覽':'📋 排程總覽（'+(prodWeekOffset>0?'+':'')+prodWeekOffset+'週）';
   var dates=[];for(var i=0;i<6;i++){var d=new Date(weekStart);d.setDate(d.getDate()+i);dates.push(d.toISOString().substring(0,10))}
   var h='';
   var hasAny=false;
