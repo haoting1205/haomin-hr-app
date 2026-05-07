@@ -988,7 +988,8 @@ function renderProdWeekView(){
       var stIcon=item.status==='已完成'?'✅':item.status==='生產中'?'🔵':'⬜';
       var myRpt=prodReports[item.id]?prodReports[item.id][curEmp.id]:null;
       h+='<div style="display:flex;align-items:center;gap:4px;font-size:11px;color:'+(done||item.status==='已完成'?'#166534':'#333')+';padding:2px 0 2px 12px">'+stIcon+' '+item.recipeName+' x'+item.multiplier+' '+item.output+item.unit;
-      if(myRpt){h+=' <span style="color:#166534;font-weight:700">['+myRpt.actual+(myRpt.unit||'')+(myRpt.extraG?' +'+myRpt.extraG+(myRpt.extraUnit||'g'):'')+']</span> <button id="prod-edit-'+item.id+'" style="padding:1px 6px;background:#dbeafe;color:#1e40af;border:none;border-radius:3px;font-size:10px;cursor:pointer">✏</button>'}
+      if(myRpt){h+=' <span style="color:#166534;font-weight:700">['+myRpt.actual+(myRpt.unit||'')+(myRpt.extraG?' +'+myRpt.extraG+(myRpt.extraUnit||'g'):'')+']</span>'}
+      h+=' <button id="prod-wk-'+item.id+'" style="padding:1px 6px;background:'+(myRpt?'#dbeafe':'#fef3c7')+';color:'+(myRpt?'#1e40af':'#92400e')+';border:none;border-radius:3px;font-size:10px;cursor:pointer">'+(myRpt?'✏修改':'📝填寫')+'</button>';
       h+='</div>';
     });
     h+='</div>';
@@ -996,14 +997,42 @@ function renderProdWeekView(){
   if(!hasAny)h='<div style="text-align:center;padding:16px;color:var(--gray4)">本週無排程</div>';
   document.getElementById('prod-week-view').innerHTML=h;
   prodSchedule.forEach(function(item){
-    var btn=document.getElementById('prod-edit-'+item.id);
-    if(btn){(function(it){btn.onclick=function(){editProdReport(it.id)}})(item)}
+    var btn=document.getElementById('prod-wk-'+item.id);
+    if(btn){(function(it){btn.onclick=function(){
+      var rpt=prodReports[it.id]?prodReports[it.id][curEmp.id]:null;
+      if(rpt){editProdReport(it.id)}
+      else{fillPastReport(it)}
+    }})(item)}
   });
 }
 function getAppWeekStr(d){var jan1=new Date(d.getFullYear(),0,1);var days=Math.floor((d-jan1)/(86400000));var wn=Math.ceil((days+jan1.getDay()+1)/7);return d.getFullYear()+'-W'+String(wn).padStart(2,'0')}
 
 
 
+
+
+function fillPastReport(item){
+  var batch=prompt('批號：','');
+  if(batch===null)return;
+  if(!batch){alert('請輸入批號');return}
+  var actual=prompt('實際數量（'+item.unit+'）：','');
+  if(actual===null)return;
+  if(!actual){alert('請輸入數量');return}
+  var extraG=prompt('零頭數量（沒有填0）：','0');
+  if(extraG===null)return;
+  var extraUnit='g';
+  if(+extraG>0){extraUnit=prompt('零頭單位（g/支/個/包）：','g');if(extraUnit===null)return}
+  if(!prodReports[item.id])prodReports[item.id]={};
+  prodReports[item.id][curEmp.id]={batch:batch,actual:+actual,extraG:+extraG||0,extraUnit:extraUnit,unit:item.unit,name:curEmp.name,time:new Date().toTimeString().substring(0,5),date:new Date().toISOString(),recipeName:item.recipeName};
+  if(db){
+    db.collection(fbEnv+'_hrdata').doc('prodReports').set({data:prodReports}).then(function(){
+      syncReportToERP(item.id,batch,+actual,+extraG||0,item.unit);
+      alert('✅ 已填寫');
+      renderProdWeekView();
+      renderProdToday();
+    }).catch(function(e){alert('失敗：'+e.message)});
+  }
+}
 
 function editProdReport(itemId){
   var rpt=prodReports[itemId]?prodReports[itemId][curEmp.id]:null;
