@@ -916,10 +916,10 @@ function renderProdToday(){
       h+='<div style="display:flex;align-items:center;gap:8px">';
       h+='<span style="font-size:12px;color:#666">產出：<b>'+item.output+' '+item.unit+'</b> (x'+item.multiplier+')</span>';
       if(rpt){
-        h+='<span style="font-size:12px;color:#166534;font-weight:700">✅ 已回報：'+(rpt.batch?'['+rpt.batch+'] ':'')+rpt.actual+' '+(rpt.unit||item.unit)+(rpt.extraG?' + '+rpt.extraG+'g':'')+'</span> <button id="prod-edit-today-'+ii+'" style="padding:2px 8px;background:#dbeafe;color:#1e40af;border:none;border-radius:4px;font-size:10px;cursor:pointer">✏修改</button>';
+        h+='<span style="font-size:12px;color:#166534;font-weight:700">✅ 已回報：'+(rpt.batch?'['+rpt.batch+'] ':'')+rpt.actual+' '+(rpt.unit||item.unit)+(rpt.extraG?' + '+rpt.extraG+(rpt.extraUnit||'g'):'')+'</span> <button id="prod-edit-today-'+ii+'" style="padding:2px 8px;background:#dbeafe;color:#1e40af;border:none;border-radius:4px;font-size:10px;cursor:pointer">✏修改</button>';
         h+='<span style="font-size:10px;color:#999">'+rpt.time+'</span>';
       }else if(item.status!=='已完成'){
-        h+='<div style="display:flex;align-items:center;gap:4px;margin-top:4px;flex-wrap:wrap"><input id="prod-batch-'+ii+'" placeholder="批號" style="width:80px;padding:6px;border:1px solid #ccc;border-radius:6px;font-size:12px;font-family:JetBrains Mono,monospace"><input type="number" id="prod-actual-'+ii+'" placeholder="整數" style="width:55px;padding:6px;border:1px solid #ccc;border-radius:6px;font-size:13px;text-align:center"><span style="font-size:12px">'+item.unit+'</span><span style="font-size:11px;color:#666">+</span><input type="number" id="prod-extra-'+ii+'" placeholder="0" style="width:50px;padding:6px;border:1px solid #ccc;border-radius:6px;font-size:13px;text-align:center"><span style="font-size:12px">g</span>';
+        h+='<div style="display:flex;align-items:center;gap:4px;margin-top:4px;flex-wrap:wrap"><input id="prod-batch-'+ii+'" placeholder="批號" style="width:80px;padding:6px;border:1px solid #ccc;border-radius:6px;font-size:12px;font-family:JetBrains Mono,monospace"><input type="number" id="prod-actual-'+ii+'" placeholder="整數" style="width:55px;padding:6px;border:1px solid #ccc;border-radius:6px;font-size:13px;text-align:center"><span style="font-size:12px">'+item.unit+'</span><span style="font-size:11px;color:#666">+</span><input type="number" id="prod-extra-'+ii+'" placeholder="0" style="width:50px;padding:6px;border:1px solid #ccc;border-radius:6px;font-size:13px;text-align:center"><select id="prod-extra-unit-'+ii+'" style="padding:4px;border:1px solid #ccc;border-radius:6px;font-size:11px"><option>g</option><option>支</option><option>個</option><option>包</option></select>';
         h+='<button id="prod-btn-'+ii+'" style="padding:6px 12px;background:#166534;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">📤 回報</button></div>';
       }else{
         h+='<span style="font-size:12px;color:#166534">✅ 已完成</span>';
@@ -947,10 +947,12 @@ function reportProdItem(itemId,idx){
   var actual=+inp.value;
   var extraInp=document.getElementById('prod-extra-'+idx);
   var extraG=extraInp?+extraInp.value||0:0;
+  var extraUnitEl=document.getElementById('prod-extra-unit-'+idx);
+  var extraUnit=extraUnitEl?extraUnitEl.value:'g';
   var item=prodSchedule.find(function(s){return s.id===itemId});
   if(!item){alert('找不到排程');return}
   if(!prodReports[itemId])prodReports[itemId]={};
-  var rUnit=document.getElementById('prod-unit-'+idx);var unitVal=rUnit?rUnit.value:item.unit;var unitVal=item.unit;prodReports[itemId][curEmp.id]={batch:batch,actual:actual,extraG:extraG,unit:unitVal,name:curEmp.name,time:new Date().toTimeString().substring(0,5),date:new Date().toISOString(),recipeName:item.recipeName};
+  var rUnit=document.getElementById('prod-unit-'+idx);var unitVal=rUnit?rUnit.value:item.unit;var unitVal=item.unit;prodReports[itemId][curEmp.id]={batch:batch,actual:actual,extraG:extraG,extraUnit:extraUnit,unit:unitVal,name:curEmp.name,time:new Date().toTimeString().substring(0,5),date:new Date().toISOString(),recipeName:item.recipeName};
   if(db){
     db.collection(fbEnv+'_hrdata').doc('prodReports').set({data:prodReports}).then(function(){
       syncReportToERP(itemId,batch,actual,extraG,unitVal);
@@ -979,7 +981,7 @@ function renderProdWeekView(){
       var stIcon=item.status==='已完成'?'✅':item.status==='生產中'?'🔵':'⬜';
       var myRpt=prodReports[item.id]?prodReports[item.id][curEmp.id]:null;
       h+='<div style="display:flex;align-items:center;gap:4px;font-size:11px;color:'+(done||item.status==='已完成'?'#166534':'#333')+';padding:2px 0 2px 12px">'+stIcon+' '+item.recipeName+' x'+item.multiplier+' '+item.output+item.unit;
-      if(myRpt){h+=' <span style="color:#166534;font-weight:700">['+myRpt.actual+(myRpt.unit||'')+']</span> <button id="prod-edit-'+item.id+'" style="padding:1px 6px;background:#dbeafe;color:#1e40af;border:none;border-radius:3px;font-size:10px;cursor:pointer">✏</button>'}
+      if(myRpt){h+=' <span style="color:#166534;font-weight:700">['+myRpt.actual+(myRpt.unit||'')+(myRpt.extraG?' +'+myRpt.extraG+(myRpt.extraUnit||'g'):'')+']</span> <button id="prod-edit-'+item.id+'" style="padding:1px 6px;background:#dbeafe;color:#1e40af;border:none;border-radius:3px;font-size:10px;cursor:pointer">✏</button>'}
       h+='</div>';
     });
     h+='</div>';
@@ -1004,12 +1006,15 @@ function editProdReport(itemId){
   if(newBatch===null)return;
   var newActual=prompt('整數數量（'+item.unit+'）：',rpt.actual);
   if(newActual===null)return;
-  var newExtraG=prompt('零頭克數（g，沒有填0）：',rpt.extraG||0);
+  var newExtraG=prompt('零頭數量（沒有填0）：',rpt.extraG||0);
   if(newExtraG===null)return;
+  var newExtraUnit=prompt('零頭單位（g/支/個/包）：',rpt.extraUnit||'g');
+  if(newExtraUnit===null)return;
   
   rpt.batch=newBatch;
   rpt.actual=+newActual;
   rpt.extraG=+newExtraG||0;
+  rpt.extraUnit=newExtraUnit||'g';
   rpt.editedAt=new Date().toISOString();
   if(db){
     db.collection(fbEnv+'_hrdata').doc('prodReports').set({data:prodReports}).then(function(){
@@ -1029,7 +1034,7 @@ function syncReportToERP(itemId,batch,actual,extraG,unit){
     var item=sched.find(function(s){return s.id===itemId});
     if(!item)return;
     if(!item.appReports)item.appReports=[];
-    item.appReports.push({eid:curEmp.id,name:curEmp.name,batch:batch,actual:actual,extraG:extraG,unit:unit,time:new Date().toISOString()});
+    item.appReports.push({eid:curEmp.id,name:curEmp.name,batch:batch,actual:actual,extraG:extraG,extraUnit:extraUnit,unit:unit,time:new Date().toISOString()});
     item.appActual=(item.appActual||0)+actual;
     db.collection('erp').doc('state').set(doc.data()).catch(function(){});
   }).catch(function(){});
