@@ -472,7 +472,7 @@ function getGPS(){
 
 function gpsDist(a,b,c,d){var R=6371000,dL=(c-a)*Math.PI/180,dN=(d-b)*Math.PI/180,x=Math.sin(dL/2)*Math.sin(dL/2)+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dN/2)*Math.sin(dN/2);return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x))}
 
-function appPunch(type){if(!curEmp){alert('未綁定員工');return}if(curEmp.boundDevice&&curEmp.boundDevice!==getDeviceId()){alert('⚠ 此帳號已綁定其他裝置\n請使用綁定的手機打卡');return}var pStore=document.getElementById('p-store');if(!pStore||!pStore.value){alert('請先選擇打卡門市');return}if(!_lat||!_lng){alert('📍 請開啟手機定位功能\n\n打卡需要 GPS 定位確認您在門市範圍內');return}var _psh=storeHours[pStore.value];if(!_psh){alert('門市設定錯誤');return}var _pd=gpsDist(_lat,_lng,_psh.lat,_psh.lng);if(_pd>_psh.radius){alert('⚠ 不在「'+pStore.value+'」範圍內\n\n目前距離：'+Math.round(_pd)+'m\n允許範圍：'+_psh.radius+'m\n\n請到門市範圍內再打卡');return}/* PIN已取消 */var now=new Date();var today=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());var time=pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds());var rec={id:'p'+Date.now(),eid:curEmp.id,name:curEmp.name,store:(pStore?pStore.value:curEmp.store)||'',date:today,time:time,type:type,gps:_lat?(_lat.toFixed(5)+','+_lng.toFixed(5)):'無定位',ts:now.toISOString()};var local=JSON.parse(localStorage.getItem('hm_app_punch')||'[]');local.push(rec);localStorage.setItem('hm_app_punch',JSON.stringify(local));if(db&&navigator.onLine){db.collection(fbEnv+'_hrdata').doc('punchRecords').get().then(function(doc){var data=doc.exists?doc.data().data||[]:[];data.push(rec);db.collection(fbEnv+'_hrdata').doc('punchRecords').set({data:data}).catch(function(e){saveOfflinePunch(rec)})}).catch(function(){saveOfflinePunch(rec)})}else{saveOfflinePunch(rec)}var res=document.getElementById('p-result');res.style.display='block';var tc=type==='上班'?'#166534':type==='下班'?'#991b1b':type==='外出'?'#92400e':'#0369a1';var bg=type==='上班'?'#dcfce7':type==='下班'?'#fee2e2':type==='外出'?'#fef3c7':'#e0f2fe';res.style.background=bg;res.style.color=tc;res.innerHTML='<div style="font-size:28px;margin-bottom:4px">'+(type==='上班'?'☀':type==='下班'?'🌙':type==='外出'?'🚶':'🏢')+'</div><div style="font-size:20px;font-weight:700">'+type+'打卡成功</div><div style="font-size:24px;font-weight:700;font-family:JetBrains Mono,monospace;margin-top:4px">'+time+'</div>';renderPunchToday()}
+function appPunch(type){if(!curEmp){alert('未綁定員工');return}/* device binding removed */var pStore=document.getElementById('p-store');if(!pStore||!pStore.value){alert('請先選擇打卡門市');return}if(!_lat||!_lng){alert('📍 請開啟手機定位功能\n\n打卡需要 GPS 定位確認您在門市範圍內');return}var _psh=storeHours[pStore.value];if(!_psh){alert('門市設定錯誤');return}var _pd=gpsDist(_lat,_lng,_psh.lat,_psh.lng);if(_pd>_psh.radius){alert('⚠ 不在「'+pStore.value+'」範圍內\n\n目前距離：'+Math.round(_pd)+'m\n允許範圍：'+_psh.radius+'m\n\n請到門市範圍內再打卡');return}/* PIN已取消 */var now=new Date();var today=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());var time=pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds());var rec={id:'p'+Date.now(),eid:curEmp.id,name:curEmp.name,store:(pStore?pStore.value:curEmp.store)||'',date:today,time:time,type:type,gps:_lat?(_lat.toFixed(5)+','+_lng.toFixed(5)):'無定位',ts:now.toISOString()};var local=JSON.parse(localStorage.getItem('hm_app_punch')||'[]');local.push(rec);localStorage.setItem('hm_app_punch',JSON.stringify(local));if(db&&navigator.onLine){db.collection(fbEnv+'_hrdata').doc('punchRecords').get().then(function(doc){var data=doc.exists?doc.data().data||[]:[];data.push(rec);db.collection(fbEnv+'_hrdata').doc('punchRecords').set({data:data}).catch(function(e){saveOfflinePunch(rec)})}).catch(function(){saveOfflinePunch(rec)})}else{saveOfflinePunch(rec)}var res=document.getElementById('p-result');res.style.display='block';var tc=type==='上班'?'#166534':type==='下班'?'#991b1b':type==='外出'?'#92400e':'#0369a1';var bg=type==='上班'?'#dcfce7':type==='下班'?'#fee2e2':type==='外出'?'#fef3c7':'#e0f2fe';res.style.background=bg;res.style.color=tc;res.innerHTML='<div style="font-size:28px;margin-bottom:4px">'+(type==='上班'?'☀':type==='下班'?'🌙':type==='外出'?'🚶':'🏢')+'</div><div style="font-size:20px;font-weight:700">'+type+'打卡成功</div><div style="font-size:24px;font-weight:700;font-family:JetBrains Mono,monospace;margin-top:4px">'+time+'</div>';renderPunchToday()}
 
 function renderPunchToday(){var now=new Date();var today=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());var local=JSON.parse(localStorage.getItem('hm_app_punch')||'[]');var recs=local.filter(function(r){return r.eid===(curEmp?curEmp.id:'')&&r.date===today}).sort(function(a,b){return a.time>b.time?1:-1});var h='';if(!recs.length)h='<div style="text-align:center;padding:16px;color:var(--gray4)">今日尚無打卡紀錄</div>';recs.forEach(function(r){var tc=r.type==='上班'?'#166534':r.type==='下班'?'#991b1b':r.type==='外出'?'#92400e':'#0369a1';var bg=r.type==='上班'?'#dcfce7':r.type==='下班'?'#fee2e2':r.type==='外出'?'#fef3c7':'#e0f2fe';h+='<div class="punch-row"><span style="background:'+bg+';color:'+tc+';padding:3px 10px;border-radius:8px;font-weight:700;font-size:12px;min-width:50px;text-align:center">'+r.type+'</span><span style="font-family:JetBrains Mono,monospace;font-weight:700;font-size:16px;margin-left:auto">'+r.time+'</span></div>'});document.getElementById('p-today').innerHTML=h}
 
@@ -522,8 +522,7 @@ function doAppForgot(){
         if(!verified){alert('驗證失敗\n\n請輸入以下任一項：\n• 身分證字號\n• 出生日期（如 1990-01-15）\n• 手機號碼\n\n若仍無法重設，請聯繫店長或老闆');return}
         var newPass=user+'aa';
         acct.pass=hashPass(newPass);
-        emp.boundDevice='';
-        db.collection(fbEnv+'_employees').doc(emp.id).update({boundDevice:''}).catch(function(){});
+        /* device binding removed */
         db.collection(fbEnv+'_hrdata').doc('accounts').set({userAccounts:accounts}).then(function(){
           alert('✅ 密碼已重設\n\n帳號：'+user+'\n新密碼：'+newPass+'\n\n登入後請至「👤 我的」修改密碼');
           hideAppForgot();
@@ -737,11 +736,34 @@ function loadMgrAttend(){
       h+='<div style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid var(--gray1);font-size:13px"><span style="flex:1;font-weight:700">'+emp.name+'</span><span style="font-family:JetBrains Mono,monospace;color:'+inColor+'">'+inTime+'</span><span style="margin:0 6px;color:#999">~</span><span style="font-family:JetBrains Mono,monospace">'+outTime+'</span></div>';
     }
     
-    var notPunched=staff.filter(function(e){return!e.leave_date&&!byEmp[e.id]});
+    var LEAVE_TYPES=['例假','休假','國定假日','特休','事假','病假','婚假','喪假','產假','陪產假','公假','補休','家庭照顧假','生理假'];
+    var notPunched=staff.filter(function(e){
+      if(e.leave_date)return false;
+      if(byEmp[e.id])return false;
+      var sc=sched[e.id]?sched[e.id][today]:null;
+      if(sc&&LEAVE_TYPES.indexOf(sc.type)>=0)return false;
+      if(!sc&&new Date(today).getDay()===0)return false;
+      return true;
+    });
     if(notPunched.length>0){
-      h+='<div style="font-size:12px;font-weight:700;color:#991b1b;margin-top:10px">⚠ 未打卡 ('+notPunched.length+')</div>';
+      h+='<div style="font-size:12px;font-weight:700;color:#991b1b;margin-top:10px">⚠ 應上班未打卡 ('+notPunched.length+')</div>';
       notPunched.forEach(function(e){
         h+='<div style="padding:4px 0;font-size:12px;color:#991b1b">'+e.name+' ('+e.store+')</div>';
+      });
+    }
+    var onLeave=staff.filter(function(e){
+      if(e.leave_date)return false;
+      var sc=sched[e.id]?sched[e.id][today]:null;
+      if(sc&&LEAVE_TYPES.indexOf(sc.type)>=0)return true;
+      if(!sc&&new Date(today).getDay()===0)return true;
+      return false;
+    });
+    if(onLeave.length>0){
+      h+='<div style="font-size:12px;font-weight:700;color:#166534;margin-top:10px">🏖 今日休假 ('+onLeave.length+')</div>';
+      onLeave.forEach(function(e){
+        var sc=sched[e.id]?sched[e.id][today]:null;
+        var ltype=sc?sc.type:'例假';
+        h+='<div style="padding:4px 0;font-size:12px;color:#166534">'+e.name+' ('+ltype+')</div>';
       });
     }
     document.getElementById('mgr-attend-today').innerHTML=h;
@@ -801,8 +823,8 @@ function loadMgrReport(){
 
 
 
-function getDeviceId(){var id=localStorage.getItem('hm_device_id');if(!id){id='dev_'+Date.now()+'_'+Math.random().toString(36).substring(2,8);localStorage.setItem('hm_device_id',id)}return id}
-function checkDeviceBind(){if(!curEmp)return;var devId=getDeviceId();if(!curEmp.boundDevice||curEmp.boundDevice===''){curEmp.boundDevice=devId;db.collection(fbEnv+'_employees').doc(curEmp.id).update({boundDevice:devId}).catch(function(){});console.log('Device bound: '+devId);return}if(curEmp.boundDevice!==devId){alert('⚠ 此帳號已綁定其他裝置\n\n如需更換裝置，請聯繫店長或老闆解除綁定');appLogout();return}}
+function getDeviceId(){return ''}
+function checkDeviceBind(){/* removed */}
 
 
 var schedViewMode='my';
