@@ -1143,6 +1143,7 @@ function onDataReady(){
   checkLeaveResult();
   checkSchedChange();
   checkBirthdayNotify();
+  checkNewHireNotify();
   setInterval(checkNoPunchAlert,300000);
 }
 
@@ -1311,6 +1312,22 @@ function collectNhCerts(){
     certs.push({name:name,date:row.querySelector('.nh-cert-date').value,expiry:row.querySelector('.nh-cert-expiry').value});
   });
   return certs;
+}
+
+function checkNewHireNotify(){
+  if(!curEmp)return;
+  var isMgr=curAcct&&(curAcct.role==='老闆'||curAcct.role==='boss'||curAcct.role==='店長');
+  if(!isMgr)return;
+  if(!db)return;
+  db.collection(fbEnv+'_hrdata').doc('newHireApply').get().then(function(doc){
+    var list=doc.exists?doc.data().data||[]:[];
+    var pending=list.filter(function(a){return a.status==='待匯入'});
+    var el=document.getElementById('newhire-notify');
+    if(!el){el=document.createElement('div');el.id='newhire-notify';var home=document.getElementById('preleave-remind');if(home)home.parentNode.insertBefore(el,home)}
+    if(pending.length===0){el.innerHTML='';return}
+    var names=pending.map(function(a){return a.name}).join('、');
+    el.innerHTML='<div style="padding:14px;background:linear-gradient(135deg,#dbeafe,#eff6ff);border:2px solid #3b82f6;border-radius:12px;margin-bottom:10px"><div style="font-size:14px;font-weight:700;color:#1e40af">📋 新人報到待處理 ('+pending.length+')</div><div style="font-size:12px;color:#1e40af;margin-top:4px">'+names+'</div><div style="font-size:11px;color:#2563eb;margin-top:4px">請至管理端「📋 新人報到」匯入員工資料</div></div>';
+  }).catch(function(){});
 }
 </script>
 
