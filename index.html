@@ -65,6 +65,14 @@ body{font-family:'Noto Sans TC',sans-serif;background:#eef2f7;color:var(--gray6)
 .sched-day .leave{font-weight:700;font-size:13px}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.7}}
 .offline-bar{background:#f59e0b;color:#fff;text-align:center;padding:6px;font-size:12px;font-weight:700;display:none}
+.grid-title{font-size:13px;font-weight:700;color:var(--gray4);margin:8px 2px 4px}
+.grid-nav{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:4px}
+.gtile{background:#1B4F8A;border:none;border-radius:16px;padding:20px 6px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;cursor:pointer;color:#fff;box-shadow:0 3px 10px rgba(0,0,0,.14);transition:transform .1s,box-shadow .15s;min-height:120px}
+.gtile:active{transform:scale(.95);box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.gtile .gi{font-size:46px;line-height:1}
+.gtile .gl{font-size:18px;font-weight:700;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.18)}
+.gtile.primary{background:linear-gradient(135deg,#166534,#15803d);border-color:#166534;box-shadow:0 4px 14px rgba(22,101,52,.35)}
+.gtile.primary .gl{color:#fff}
 </style>
 </head>
 <body>
@@ -124,9 +132,18 @@ body{font-family:'Noto Sans TC',sans-serif;background:#eef2f7;color:var(--gray6)
 <div id="ot-choice-area"></div>
 <div id="app-pay-notify"></div>
 <div id="app-store-notes"></div>
-<div id="health-home-remind"></div><div id="prod-home-remind"></div><button class="btn btn-green" onclick="switchScreen('punch')" style="font-size:18px;padding:20px">⏰ 立即打卡</button>
-<button class="btn btn-outline" onclick="switchScreen('sched')">📅 查看班表</button>
-<button class="btn btn-outline" onclick="switchScreen('leave')">📝 請假申請</button>
+<div id="health-home-remind"></div><div id="prod-home-remind"></div><div class="grid-title">功能選單</div>
+<div class="grid-nav">
+<div class="gtile" onclick="switchScreen('punch')"><span class="gi">⏰</span><span class="gl">打卡</span></div>
+<div class="gtile" onclick="switchScreen('sched')"><span class="gi">📅</span><span class="gl">班表</span></div>
+<div class="gtile" onclick="switchScreen('leave')"><span class="gi">📝</span><span class="gl">請假</span></div>
+<div class="gtile" onclick="switchScreen('preleave')"><span class="gi">🗓</span><span class="gl">劃休</span></div>
+<div class="gtile" onclick="switchScreen('pay')"><span class="gi">💰</span><span class="gl">薪資</span></div>
+<div class="gtile" onclick="switchScreen('swap')"><span class="gi">🔄</span><span class="gl">換班</span></div>
+<div class="gtile" onclick="goMakeup()"><span class="gi">🛎️</span><span class="gl">補打卡</span></div>
+<div class="gtile" onclick="switchScreen('sop')"><span class="gi">📖</span><span class="gl">操作手冊</span></div>
+<div class="gtile" onclick="switchScreen('me')"><span class="gi">👤</span><span class="gl">我的</span></div>
+</div>
 </div>
 
 <!-- 打卡 -->
@@ -164,7 +181,7 @@ body{font-family:'Noto Sans TC',sans-serif;background:#eef2f7;color:var(--gray6)
 </div>
 
 <!-- 班表 -->
-<div class="screen" id="screen-sched"><div style="padding:8px 16px 0;display:flex;gap:8px"><button onclick="openAppSwap()" style="padding:6px 14px;background:#7c3aed;color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">🔄 換班申請</button></div>
+<div class="screen" id="screen-sched"><div style="padding:8px 16px 0;display:flex;gap:8px"><button onclick="switchScreen('swap')" style="padding:6px 14px;background:#7c3aed;color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">🔄 換班申請</button></div>
 <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap"><button class="btn btn-outline" style="flex:1;padding:8px;font-size:12px;font-weight:700" id="sched-tab-my" onclick="switchSchedView('my')">📋 我的班表</button><button class="btn btn-outline" style="flex:1;padding:8px;font-size:12px;font-weight:700" id="sched-tab-store" onclick="switchSchedView('store')">🏪 門市班表</button></div><div id="sched-store-select" style="display:none;margin-bottom:10px"><select class="fi" id="app-sched-store" onchange="renderSchedStore()" style="font-size:14px;padding:10px"><option value="總公司">總公司（中央廚房）</option><option value="交大店">交大店</option><option value="台積電店">台積電店</option></select></div><div class="card">
 <div class="card-title" id="sched-title">📅 我的班表</div>
 <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
@@ -207,8 +224,15 @@ body{font-family:'Noto Sans TC',sans-serif;background:#eef2f7;color:var(--gray6)
 <div class="screen" id="screen-sop">
 <div style="padding:16px;font-size:12px;line-height:1.8;color:#333">
 <div style="font-size:18px;font-weight:700;color:#0f1b35;margin-bottom:4px">📖 員工操作手冊</div>
-<div style="font-size:11px;color:#888;margin-bottom:16px">好洺餐飲事業有限公司 員工APP操作SOP　v3.0.1</div>
+<div style="font-size:11px;color:#888;margin-bottom:16px">好洺餐飲事業有限公司 員工APP操作SOP　v3.1.0</div>
 
+<div style="background:#166534;color:#fff;padding:8px 12px;border-radius:6px;font-weight:700;font-size:13px;margin-bottom:6px">📱 介面導覽（新版）</div>
+<div style="padding:4px 8px 12px">
+打開APP會看到<b>首頁九宮格</b>，所有功能都在這裡，圖示加大好點選：<br>
+⏰打卡（綠色，最常用）· 📅班表 · 📝請假 · 🗓劃休 · 💰薪資 · 🔄換班 · 🛎️補打卡 · 📖操作手冊 · 👤我的<br>
+<b>底部</b>固定四個最常用：🏠首頁 ⏰打卡 📅班表 👤我的，隨時一鍵切換。<br>
+任何頁面想回首頁，按底部 🏠首頁 即可。
+</div>
 <div style="background:#0f1b35;color:#f0c96a;padding:8px 12px;border-radius:6px;font-weight:700;font-size:13px;margin-bottom:6px">一、首次登入</div>
 <div style="padding:4px 8px 12px">
 <b>Step 1</b>　輸入帳號（您的員工工號，9碼數字）<br>
@@ -411,15 +435,16 @@ body{font-family:'Noto Sans TC',sans-serif;background:#eef2f7;color:var(--gray6)
 </div>
 
 <!-- 底部 Tab -->
+<div class="screen" id="screen-swap"></div>
 <div class="tab-bar">
 <button class="tab-btn active" onclick="switchScreen('home')" id="tab-home"><span class="icon">🏠</span>首頁</button>
 <button class="tab-btn" onclick="switchScreen('punch')" id="tab-punch"><span class="icon">⏰</span>打卡</button>
 <button class="tab-btn prod-tab" onclick="switchScreen('prod')" id="tab-prod" style="display:none"><span class="icon">🏭</span>生產</button>
 <button class="tab-btn" onclick="switchScreen('sched')" id="tab-sched"><span class="icon">📅</span>班表</button>
-<button class="tab-btn" onclick="switchScreen('preleave')" id="tab-preleave"><span class="icon">🗓</span>劃休</button>
-<button class="tab-btn" onclick="switchScreen('leave')" id="tab-leave"><span class="icon">📝</span>請假</button>
-<button class="tab-btn" onclick="switchScreen('pay')" id="tab-pay"><span class="icon">💰</span>薪資</button>
-<button class="tab-btn" onclick="switchScreen('me')" id="tab-me"><span class="icon">👤</span>我的</button><button class="tab-btn mgr-tab" onclick="switchScreen('approve')" id="tab-approve" style="display:none"><span class="icon">📋</span>審核</button><button class="tab-btn mgr-tab" onclick="switchScreen('attend')" id="tab-attend" style="display:none"><span class="icon">📊</span>出勤</button><button class="tab-btn mgr-tab" onclick="switchScreen('report')" id="tab-report" style="display:none"><span class="icon">📈</span>報表</button>
+<button class="tab-btn" onclick="switchScreen('me')" id="tab-me"><span class="icon">👤</span>我的</button>
+<button class="tab-btn mgr-tab" onclick="switchScreen('approve')" id="tab-approve" style="display:none"><span class="icon">📋</span>審核</button>
+<button class="tab-btn mgr-tab" onclick="switchScreen('attend')" id="tab-attend" style="display:none"><span class="icon">📊</span>出勤</button>
+<button class="tab-btn mgr-tab" onclick="switchScreen('report')" id="tab-report" style="display:none"><span class="icon">📈</span>報表</button>
 </div>
 
 <script>
@@ -450,7 +475,8 @@ function loadData(){if(!db){renderAll();return}db.collection(fbEnv+'_employees')
 
 function findCurEmp(){if(curAcct&&curAcct.empId){curEmp=staff.find(function(e){return e.id===curAcct.empId})}if(!curEmp&&staff.length){curEmp=staff[0]}}
 
-function switchScreen(name){document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active')});document.querySelectorAll('.tab-btn').forEach(function(t){t.classList.remove('active')});document.getElementById('screen-'+name).classList.add('active');document.getElementById('tab-'+name).classList.add('active');if(name==='home'&&typeof loadEmpStats==='function')loadEmpStats();if(name==='prod'){refreshProdData()}if(name==='approve')loadMgrApprove();if(name==='attend')loadMgrAttend();if(name==='report')loadMgrReport();if(name==='punch')initPunchScreen();if(name==='sched'){if(schedViewMode==='store')renderSchedStore();else renderSched()}if(name==='leave')renderLeave();if(name==='pay')renderPay();if(name==='me')renderMe();if(name==='preleave')renderPreLeave();if(name==='swap')openAppSwap();if(name==='sop'){}}
+function goMakeup(){switchScreen('punch');setTimeout(function(){var el=document.getElementById('app-makeup-date');if(el&&el.scrollIntoView)el.scrollIntoView({behavior:'smooth',block:'center'})},350)}
+function switchScreen(name){document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active')});document.querySelectorAll('.tab-btn').forEach(function(t){t.classList.remove('active')});var _sc=document.getElementById('screen-'+name);if(_sc)_sc.classList.add('active');var _tb=document.getElementById('tab-'+name);if(_tb)_tb.classList.add('active');try{window.scrollTo(0,0)}catch(e){}if(name==='home'&&typeof loadEmpStats==='function')loadEmpStats();if(name==='prod'){refreshProdData()}if(name==='approve')loadMgrApprove();if(name==='attend')loadMgrAttend();if(name==='report')loadMgrReport();if(name==='punch')initPunchScreen();if(name==='sched'){if(schedViewMode==='store')renderSchedStore();else renderSched()}if(name==='leave')renderLeave();if(name==='pay')renderPay();if(name==='me')renderMe();if(name==='preleave')renderPreLeave();if(name==='swap')openAppSwap();if(name==='sop'){}}
 
 function renderAll(){if(!curEmp){document.getElementById('home-name').textContent='未綁定員工';return}document.getElementById('app-name').textContent=curEmp.name;document.getElementById('app-role').textContent=curEmp.role+' · '+(curEmp.store||'');document.getElementById('home-avatar').textContent=curEmp.name[0];document.getElementById('home-name').textContent=curEmp.name;document.getElementById('home-sub').textContent=curEmp.role+' · '+(curEmp.store||'')+' · 到職 '+(curEmp.hire_date||'─');document.getElementById('home-vac').textContent='─';document.getElementById('home-attend').textContent='─'}
 
@@ -584,7 +610,7 @@ function loadMakeupHistory(){if(!curEmp||!db)return;db.collection(fbEnv+'_hrdata
 function loadStoreNotes(){if(!curEmp||!db)return;db.collection(fbEnv+'_hrdata').doc('storeNotes').get().then(function(doc){if(!doc.exists)return;var notes=doc.data().data||{};var store=curEmp.store||'總公司';var today=new Date().toISOString().substring(0,10);var noteKey=store+'_'+today;var note=notes[noteKey];var el=document.getElementById('app-store-notes');if(!el)return;if(!note||!note.content){el.innerHTML='';return}el.innerHTML='<div style="padding:14px;background:linear-gradient(135deg,#fee2e2,#fff1f2);border:2px solid #dc2626;border-radius:12px;margin-bottom:10px"><div style="font-size:14px;font-weight:700;color:#92400e;margin-bottom:4px">📋 今日交接事項</div><div style="font-size:12px;color:#92400e;line-height:1.6">'+note.content.replace(/\n/g,'<br>')+'</div><div style="font-size:10px;color:#b45309;margin-top:6px">— '+note.by+' '+(note.time||'')+'</div></div>'}).catch(function(){})}
 
 
-function openAppSwap(){if(!curEmp||!db)return;var h='<div style="font-size:16px;font-weight:700;color:#0f1b35;margin-bottom:12px">🔄 換班申請</div>';h+='<div style="margin-bottom:8px"><span style="font-size:11px;color:#666">換班日期</span><input class="fi" type="date" id="app-swap-date"></div>';h+='<div style="margin-bottom:8px"><span style="font-size:11px;color:#666">想換的對象</span><select class="fi" id="app-swap-target">';staff.forEach(function(e){if(e.id!==curEmp.id&&!e.leave_date)h+='<option value="'+e.id+'">'+e.name+'</option>'});h+='</select></div>';h+='<div style="margin-bottom:8px"><span style="font-size:11px;color:#666">原因</span><input class="fi" id="app-swap-reason" placeholder="換班原因"></div>';h+='<button onclick="submitAppSwap()" style="width:100%;padding:10px;background:#7c3aed;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">📤 提交換班申請</button>';h+='<div id="app-swap-list" style="margin-top:12px"></div>';document.getElementById('screen-preleave').innerHTML='<div style="padding:16px">'+h+'</div>';loadAppSwapHistory()}
+function openAppSwap(){if(!curEmp||!db)return;var h='<div style="font-size:16px;font-weight:700;color:#0f1b35;margin-bottom:12px">🔄 換班申請</div>';h+='<div style="margin-bottom:8px"><span style="font-size:11px;color:#666">換班日期</span><input class="fi" type="date" id="app-swap-date"></div>';h+='<div style="margin-bottom:8px"><span style="font-size:11px;color:#666">想換的對象</span><select class="fi" id="app-swap-target">';staff.forEach(function(e){if(e.id!==curEmp.id&&!e.leave_date)h+='<option value="'+e.id+'">'+e.name+'</option>'});h+='</select></div>';h+='<div style="margin-bottom:8px"><span style="font-size:11px;color:#666">原因</span><input class="fi" id="app-swap-reason" placeholder="換班原因"></div>';h+='<button onclick="submitAppSwap()" style="width:100%;padding:10px;background:#7c3aed;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">📤 提交換班申請</button>';h+='<div id="app-swap-list" style="margin-top:12px"></div>';document.getElementById('screen-swap').innerHTML='<div style="padding:16px">'+h+'</div>';loadAppSwapHistory()}
 function submitAppSwap(){if(!curEmp||!db)return;var date=document.getElementById('app-swap-date').value;var target=document.getElementById('app-swap-target').value;var reason=document.getElementById('app-swap-reason').value;if(!date||!target||!reason){alert('請填寫完整');return}var targetEmp=staff.find(function(x){return x.id===target});if(!confirm('確認提交換班申請？\n\n日期：'+date+'\n換班對象：'+targetEmp.name+'\n原因：'+reason))return;db.collection(fbEnv+'_hrdata').doc('swapRecords').get().then(function(doc){var data=doc.exists?doc.data().data||[]:[];data.push({id:'sw'+Date.now(),fromEid:curEmp.id,fromName:curEmp.name,toEid:target,toName:targetEmp.name,date:date,reason:reason,status:'待審核',submitDate:new Date().toISOString()});db.collection(fbEnv+'_hrdata').doc('swapRecords').set({data:data}).then(function(){alert('✅ 換班申請已提交\n請等待店長審核');loadAppSwapHistory()}).catch(function(e){alert('失敗：'+e.message)})}).catch(function(e){alert('連線失敗：'+e.message)})}
 function loadAppSwapHistory(){if(!curEmp||!db)return;db.collection(fbEnv+'_hrdata').doc('swapRecords').get().then(function(doc){var data=doc.exists?doc.data().data||[]:[];var mine=data.filter(function(r){return r.fromEid===curEmp.id||r.toEid===curEmp.id}).sort(function(a,b){return a.date>b.date?-1:1}).slice(0,5);var el=document.getElementById('app-swap-list');if(!el)return;if(mine.length===0){el.innerHTML='';return}var h='<div style="font-size:12px;font-weight:700;color:#666;margin-bottom:6px">近期申請</div>';mine.forEach(function(r){var stColor=r.status==='已核准'?'#166534':r.status==='已拒絕'?'#991b1b':'#92400e';var stBg=r.status==='已核准'?'#dcfce7':r.status==='已拒絕'?'#fee2e2':'#fef3c7';h+='<div style="padding:6px 8px;margin-bottom:3px;background:'+stBg+';border-radius:6px;font-size:11px"><b>'+r.fromName+'</b> ⇄ <b>'+r.toName+'</b> '+r.date+' <span style="font-weight:700;color:'+stColor+'">'+r.status+'</span></div>'});el.innerHTML=h}).catch(function(){})}
 
@@ -600,8 +626,11 @@ function submitAppSurvey(sid){if(!db)return;var scores=[];var buttons=document.q
 function syncPunchFromFB(){if(!curEmp||!db)return;db.collection(fbEnv+'_hrdata').doc('punchRecords').get().then(function(doc){if(!doc.exists)return;var data=doc.data().data||[];var myToday=data.filter(function(r){var now=new Date();var today=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());return r.eid===curEmp.id&&r.date===today});if(myToday.length>0){var local=JSON.parse(localStorage.getItem('hm_app_punch')||'[]');myToday.forEach(function(r){if(!local.find(function(x){return x.id===r.id}))local.push(r)});localStorage.setItem('hm_app_punch',JSON.stringify(local));renderPunchToday()}}).catch(function(){})}
 
 
-var APP_VERSION='3.0.3';
+var APP_VERSION='3.1.2';
 var APP_CHANGELOG=[
+{ver:'3.1.2',date:'2026-06-01',changes:['首頁九宮格改為單一品牌深藍底色（統一不雜亂）；圖示放大(46px)、文字放大(18px)、磚高加高，長輩與現場快速操作更好按']},
+{ver:'3.1.1',date:'2026-06-01',changes:['首頁九宮格改為色塊填滿樣式：每個功能各一底色（白字白圖示、加陰影更立體），辨識度更高、點擊區更明顯']},
+{ver:'3.1.0',date:'2026-06-01',changes:['【介面大改版】首頁改為大圖示九宮格功能選單（打卡/班表/請假/劃休/薪資/換班/補打卡/操作手冊/我的），圖示加大更好點選','底部分頁精簡為4個最常用（首頁/打卡/班表/我的），圖示放大；其餘功能改由首頁九宮格進入','換班改為獨立頁面導覽（修正原本點換班無畫面切換的問題）；補打卡可從首頁九宮格直接跳轉']},
 {ver:'3.0.3',date:'2026-06-01',changes:['班表新增「🌙休息日加班」顯示：管理端排班設為休息日加班班別時，員工班表該日標示休息日加班與時段（與管理端v3.13休息日加班三段式同步）','操作手冊第三章補充休息日加班說明','補打卡功能確認正常（表單在打卡頁下方「📋補打卡申請」，自v3.0.2已修復UI）']},
 {ver:'3.0.2',date:'2026-05-30',changes:['修復班表切換月份不會重新載入該月排班的問題（翻月原本只顯示預設班次）','改用獨立檢視變數載入，不影響店長考勤/未打卡警示所依賴的當月資料']},
 {ver:'3.0.1',date:'2026-05-21',changes:['修復打卡頁「補打卡申請」表單消失問題（表單入口已補回）','新增APP版本號顯示與更新紀錄','補打卡流程：填寫→送出→店長審核→寫入打卡紀錄']},
