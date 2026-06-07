@@ -134,6 +134,7 @@ body{font-family:'Noto Sans TC',sans-serif;background:#eef2f7;color:var(--gray6)
 <div id="app-store-notes"></div>
 <div id="health-home-remind"></div><div id="prod-home-remind"></div><div class="grid-title">功能選單</div>
 <div class="grid-nav">
+<div class="gtile" onclick="switchScreen('order')"><span class="gi">🛒</span><span class="gl">叫貨</span></div>
 <div class="gtile" onclick="switchScreen('punch')"><span class="gi">⏰</span><span class="gl">打卡</span></div>
 <div class="gtile" onclick="switchScreen('sched')"><span class="gi">📅</span><span class="gl">班表</span></div>
 <div class="gtile" onclick="switchScreen('leave')"><span class="gi">📝</span><span class="gl">請假</span></div>
@@ -145,6 +146,9 @@ body{font-family:'Noto Sans TC',sans-serif;background:#eef2f7;color:var(--gray6)
 <div class="gtile" onclick="switchScreen('me')"><span class="gi">👤</span><span class="gl">我的</span></div>
 </div>
 </div>
+
+<!-- 叫貨 -->
+<div class="screen" id="screen-order"><div id="order-area"></div></div>
 
 <!-- 打卡 -->
 <div class="screen" id="screen-punch">
@@ -303,7 +307,7 @@ body{font-family:'Noto Sans TC',sans-serif;background:#eef2f7;color:var(--gray6)
 <div style="padding:4px 8px 12px">
 • 點「💰 薪資」查看每月薪資明細<br>
 • 顯示：本薪+津貼+加班費-勞保-健保-所得稅=實發<br>
-• 發薪日：每月10日（遇假日提前）<br>• 🤝 若您有跨店支援(以時薪計酬)，薪資頁下方會另外顯示「跨店支援時薪」明細與小計（本店月薪之外的額外工資；勞健保不重複扣、所得稅併入主單）
+• 發薪日：每月10日（遇假日提前）<br>• 🤝 若您有跨店支援(以時薪計酬)，薪資頁下方會另外顯示「跨店支援時薪」明細與小計（本店月薪之外的額外工資；勞健保不重複扣、所得稅併入主單）<br>• 🛒 叫貨：首頁點「叫貨」→ 系統自動帶出您門市的叫貨連結，按「立即叫貨」開啟；也可從各店清單選擇其他門市叫貨
 </div>
 
 <div style="background:#dc2626;color:#fff;padding:8px 12px;border-radius:6px;font-weight:700;font-size:13px;margin-bottom:6px">七、修改密碼 / 忘記密碼</div>
@@ -476,7 +480,7 @@ function loadData(){if(!db){renderAll();return}db.collection(fbEnv+'_employees')
 function findCurEmp(){if(curAcct&&curAcct.empId){curEmp=staff.find(function(e){return e.id===curAcct.empId})}if(!curEmp&&staff.length){curEmp=staff[0]}}
 
 function goMakeup(){switchScreen('punch');setTimeout(function(){var el=document.getElementById('app-makeup-date');if(el&&el.scrollIntoView)el.scrollIntoView({behavior:'smooth',block:'center'})},350)}
-function switchScreen(name){document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active')});document.querySelectorAll('.tab-btn').forEach(function(t){t.classList.remove('active')});var _sc=document.getElementById('screen-'+name);if(_sc)_sc.classList.add('active');var _tb=document.getElementById('tab-'+name);if(_tb)_tb.classList.add('active');try{window.scrollTo(0,0)}catch(e){}if(name==='home'&&typeof loadEmpStats==='function')loadEmpStats();if(name==='prod'){refreshProdData()}if(name==='approve')loadMgrApprove();if(name==='attend')loadMgrAttend();if(name==='report')loadMgrReport();if(name==='punch')initPunchScreen();if(name==='sched'){if(schedViewMode==='store')renderSchedStore();else renderSched()}if(name==='leave')renderLeave();if(name==='pay')renderPay();if(name==='me')renderMe();if(name==='preleave')renderPreLeave();if(name==='swap')openAppSwap();if(name==='sop'){}}
+function switchScreen(name){document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active')});document.querySelectorAll('.tab-btn').forEach(function(t){t.classList.remove('active')});var _sc=document.getElementById('screen-'+name);if(_sc)_sc.classList.add('active');var _tb=document.getElementById('tab-'+name);if(_tb)_tb.classList.add('active');try{window.scrollTo(0,0)}catch(e){}if(name==='order')renderOrder();if(name==='home'&&typeof loadEmpStats==='function')loadEmpStats();if(name==='prod'){refreshProdData()}if(name==='approve')loadMgrApprove();if(name==='attend')loadMgrAttend();if(name==='report')loadMgrReport();if(name==='punch')initPunchScreen();if(name==='sched'){if(schedViewMode==='store')renderSchedStore();else renderSched()}if(name==='leave')renderLeave();if(name==='pay')renderPay();if(name==='me')renderMe();if(name==='preleave')renderPreLeave();if(name==='swap')openAppSwap();if(name==='sop'){}}
 
 function renderAll(){if(!curEmp){document.getElementById('home-name').textContent='未綁定員工';return}document.getElementById('app-name').textContent=curEmp.name;document.getElementById('app-role').textContent=curEmp.role+' · '+(curEmp.store||'');document.getElementById('home-avatar').textContent=curEmp.name[0];document.getElementById('home-name').textContent=curEmp.name;document.getElementById('home-sub').textContent=curEmp.role+' · '+(curEmp.store||'')+' · 到職 '+(curEmp.hire_date||'─');document.getElementById('home-vac').textContent='─';document.getElementById('home-attend').textContent='─'}
 
@@ -535,6 +539,11 @@ function renderLeave(){if(!curEmp){return}var myLeaves=leaveRecords.filter(funct
 function renderPay(){if(!curEmp){return}var months=Object.keys(payHistory).sort().reverse();var h='';if(!months.length)h='<div style="text-align:center;padding:20px;color:var(--gray4)">尚無薪資紀錄<br><span style="font-size:12px">薪資由管理端每月存檔後顯示</span></div>';months.forEach(function(mk){var rec=payHistory[mk][curEmp.id];if(!rec)return;h+='<div class="list-item"><div style="flex:1"><div style="font-weight:700;font-size:14px">'+mk+'</div><div style="font-size:12px;color:var(--gray4)">出勤 '+rec.workDays+'天</div></div><div style="text-align:right"><div style="font-family:JetBrains Mono,monospace;font-weight:700;font-size:16px;color:#166534">'+fNT(rec.netPay)+'</div><div style="font-size:11px;color:var(--gray4)">應發 '+fNT(rec.gross)+'</div></div></div>'});h+=renderAppSupportPay();document.getElementById('pay-list').innerHTML=h}
 
 function renderAppSupportPay(){if(!curEmp)return '';var months=Object.keys(appSupportPay||{}).sort().reverse();var has=false;var sec='';months.forEach(function(mk){var list=(appSupportPay[mk]||[]).filter(function(r){return r.eid===curEmp.id});if(!list.length)return;has=true;var byStore={};list.forEach(function(r){if(!byStore[r.store])byStore[r.store]={items:[],s:0};byStore[r.store].items.push(r);byStore[r.store].s+=r.hours*r.rate});Object.keys(byStore).forEach(function(st){var g=byStore[st];sec+='<div style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:12px;padding:12px;margin-bottom:10px"><div style="font-weight:700;font-size:14px;color:#0f766e;margin-bottom:6px">🤝 '+mk+' · '+st+' 支援時薪</div>';g.items.sort(function(a,b){return a.date>b.date?1:-1}).forEach(function(r){sec+='<div style="display:flex;align-items:center;gap:8px;font-size:13px;padding:4px 0;border-bottom:1px solid #ccfbf1"><span style="font-family:JetBrains Mono,monospace">'+r.date.substring(5)+'</span><span style="color:var(--gray4)">'+r.hours+'h × '+r.rate+'</span><span style="margin-left:auto;font-family:JetBrains Mono,monospace;font-weight:700">'+fNT(r.hours*r.rate)+'</span></div>'});sec+='<div style="display:flex;justify-content:space-between;margin-top:6px;font-weight:700;color:#0f766e"><span style="font-size:13px">小計</span><span style="font-family:JetBrains Mono,monospace">'+fNT(g.s)+'</span></div></div>'})});if(!has)return '';return '<div style="margin-top:18px"><div style="font-size:13px;font-weight:700;color:var(--gray6);margin-bottom:8px">🤝 跨店支援時薪</div>'+sec+'<div style="font-size:11px;color:var(--gray4);line-height:1.6">支援時薪為您本店月薪之外的額外工資；勞健保已於本店主單投保、不重複扣繳，所得稅併入主單歸戶。</div></div>'}
+
+var ORDER_BASE='https://haoting1205.github.io/haoming-erp-app/';
+var ORDER_LINKS={'交大店':{brand:'義早交大店',url:ORDER_BASE+'?customer=1&code=001'},'台積電店':{brand:'咕咕台積電',url:ORDER_BASE+'?customer=1&code=003'}};
+function openOrderLink(url){try{window.open(url,'_blank')}catch(e){location.href=url}}
+function renderOrder(){var myStore=curEmp?(curEmp.store||''):'';var mine=ORDER_LINKS[myStore];var h='<div style="font-size:18px;font-weight:700;color:#0f1b35;margin-bottom:4px">🛒 叫貨</div><div style="font-size:12px;color:#666;margin-bottom:14px">點選門市開啟對應的叫貨系統</div>';if(mine){h+='<div class="card" style="background:linear-gradient(135deg,#0f766e,#0d9488);color:#fff"><div style="font-size:13px;opacity:.85;margin-bottom:4px">您的門市</div><div style="font-size:22px;font-weight:700">'+myStore+'</div><div style="font-size:13px;opacity:.9;margin-bottom:14px">'+mine.brand+'</div><button class="btn" style="background:#fff;color:#0f766e;margin-bottom:0" onclick="openOrderLink(\''+mine.url+'\')">🛒 立即叫貨</button></div>'}else if(myStore){h+='<div class="card" style="text-align:center"><div style="font-size:14px;color:var(--gray6)">您的門市（'+myStore+'）尚未設定叫貨連結</div><div style="font-size:12px;color:var(--gray4);margin-top:6px">請洽管理員設定</div></div>'}h+='<div class="card"><div class="card-title">🏪 各店叫貨連結</div>';var keys=Object.keys(ORDER_LINKS);if(!keys.length)h+='<div style="text-align:center;color:var(--gray4);padding:14px">尚未設定任何叫貨連結</div>';keys.forEach(function(st){var o=ORDER_LINKS[st];h+='<div class="list-item" onclick="openOrderLink(\''+o.url+'\')" style="cursor:pointer"><div style="flex:1"><div style="font-weight:700">'+st+'</div><div style="font-size:12px;color:var(--gray4)">'+o.brand+'</div></div><span style="color:#0d9488;font-weight:700;white-space:nowrap">叫貨 →</span></div>'});h+='</div>';var el=document.getElementById('order-area');if(el)el.innerHTML=h}
 
 function renderMe(){renderAppVersion();if(!curEmp)return;var e=curEmp;var h='';var hexpStr='';
   if(e.health_expiry){
@@ -628,8 +637,9 @@ function submitAppSurvey(sid){if(!db)return;var scores=[];var buttons=document.q
 function syncPunchFromFB(){if(!curEmp||!db)return;db.collection(fbEnv+'_hrdata').doc('punchRecords').get().then(function(doc){if(!doc.exists)return;var data=doc.data().data||[];var myToday=data.filter(function(r){var now=new Date();var today=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());return r.eid===curEmp.id&&r.date===today});if(myToday.length>0){var local=JSON.parse(localStorage.getItem('hm_app_punch')||'[]');myToday.forEach(function(r){if(!local.find(function(x){return x.id===r.id}))local.push(r)});localStorage.setItem('hm_app_punch',JSON.stringify(local));renderPunchToday()}}).catch(function(){})}
 
 
-var APP_VERSION='3.2.0';
+var APP_VERSION='3.3.0';
 var APP_CHANGELOG=[
+{ver:'3.3.0',date:'2026-06-07',changes:['【新功能·叫貨】首頁新增「🛒 叫貨」：自動帶出您所屬門市的叫貨連結（一鍵開啟對應叫貨系統），下方並列各店叫貨連結可切換','目前已設定：交大店→義早交大店、台積電店→咕咕台積電；其餘門市待設定']},
 {ver:'3.2.0',date:'2026-06-07',changes:['【新功能·跨店支援時薪】若您是月薪員工、到別家店以時薪支援，薪資頁下方會新增「🤝跨店支援時薪」區塊，依月份/店別顯示日期、時數、時薪、工資與小計','說明：支援時薪為本店月薪之外的額外工資；勞健保已於本店主單投保不重複扣繳，所得稅併入主單歸戶。由管理端登錄後顯示']},
 {ver:'3.1.3',date:'2026-06-07',changes:['【重大修正：打卡遺失】打卡寫入由「整包讀取再覆寫」改為 arrayUnion 原子追加，解決多人同時打卡互相覆蓋導致紀錄消失的問題；離線補傳同步亦改原子追加','【GPS 容忍】打卡範圍判定納入手機 GPS 誤差(accuracy)容忍(上限150m)，解決同一地點時可打時不可打；超出範圍時提示會顯示目前距離與GPS誤差']},
 {ver:'3.1.2',date:'2026-06-01',changes:['首頁九宮格改為單一品牌深藍底色（統一不雜亂）；圖示放大(46px)、文字放大(18px)、磚高加高，長輩與現場快速操作更好按']},
