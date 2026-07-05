@@ -13,6 +13,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.14.1/firebase-app-compat.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.14.1/firebase-firestore-compat.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.14.1/firebase-auth-compat.min.js"></script>
 <style>
 :root{--navy:#0f1b35;--gold:#f0c96a;--blue:#2563eb;--green:#16a34a;--red:#dc2626;--gray1:#f5f6fa;--gray2:#e8eaf0;--gray4:#8892b0;--gray6:#1e2340;--white:#fff}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -637,7 +638,7 @@ function submitAppSurvey(sid){if(!db)return;var scores=[];var buttons=document.q
 function syncPunchFromFB(){if(!curEmp||!db)return;db.collection(fbEnv+'_hrdata').doc('punchRecords').get().then(function(doc){if(!doc.exists)return;var data=doc.data().data||[];var myToday=data.filter(function(r){var now=new Date();var today=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());return r.eid===curEmp.id&&r.date===today});if(myToday.length>0){var local=JSON.parse(localStorage.getItem('hm_app_punch')||'[]');myToday.forEach(function(r){if(!local.find(function(x){return x.id===r.id}))local.push(r)});localStorage.setItem('hm_app_punch',JSON.stringify(local));renderPunchToday()}}).catch(function(){})}
 
 
-var APP_VERSION='3.3.0';
+var APP_VERSION='3.4.0';
 var APP_CHANGELOG=[
 {ver:'3.3.0',date:'2026-06-07',changes:['【新功能·叫貨】首頁新增「🛒 叫貨」：自動帶出您所屬門市的叫貨連結（一鍵開啟對應叫貨系統），下方並列各店叫貨連結可切換','目前已設定：交大店→義早交大店、台積電店→咕咕台積電；其餘門市待設定']},
 {ver:'3.2.0',date:'2026-06-07',changes:['【新功能·跨店支援時薪】若您是月薪員工、到別家店以時薪支援，薪資頁下方會新增「🤝跨店支援時薪」區塊，依月份/店別顯示日期、時數、時薪、工資與小計','說明：支援時薪為本店月薪之外的額外工資；勞健保已於本店主單投保不重複扣繳，所得稅併入主單歸戶。由管理端登錄後顯示']},
@@ -1372,7 +1373,7 @@ function submitNewHire(){
     bank_name:bname,bank:bank,bank_code:g('nh-bcode'),branch:g('nh-branch'),branch_code:g('nh-brcode'),bank_acct:acct,
     health_date:g('nh-health-date'),health_result:g('nh-health-result'),certs:collectNhCerts(),status:'待匯入',submitDate:new Date().toISOString(),submitId:'nh'+Date.now()
   };
-  if(!db){var cfg=JSON.parse(localStorage.getItem('hm_app_fb')||'null');if(cfg){try{firebase.initializeApp(cfg)}catch(e){}db=firebase.firestore()}}
+  if(!db){var cfg=JSON.parse(localStorage.getItem('hm_app_fb')||'null');if(cfg){try{firebase.initializeApp(cfg)}catch(e){}db=firebase.firestore();try{if(firebase.auth)firebase.auth().signInAnonymously().catch(function(e){})}catch(e){}}}
   if(!db){alert('無法連線，請稍後再試');return}
   db.collection(fbEnv+'_hrdata').doc('newHireApply').get().then(function(doc){
     var list=doc.exists?doc.data().data||[]:[];
