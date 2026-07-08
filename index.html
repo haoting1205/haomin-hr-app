@@ -47,6 +47,7 @@ body{font-family:'Noto Sans TC',sans-serif;background:#eef2f7;color:var(--gray6)
 .list-item{padding:14px 0;border-bottom:1px solid var(--gray2);display:flex;align-items:center;gap:12px}
 .list-item:last-child{border-bottom:none}
 .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700}
+.appr-badge{position:absolute;top:3px;right:calc(50% - 24px);min-width:16px;height:16px;padding:0 4px;background:#dc2626;color:#fff;border-radius:8px;font-size:10px;font-weight:700;line-height:16px;text-align:center;box-shadow:0 0 0 2px var(--card,#fff);box-sizing:border-box}
 .tab-bar{position:fixed;bottom:0;left:0;right:0;background:var(--white);border-top:1px solid var(--gray2);display:flex;z-index:100;padding-bottom:env(safe-area-inset-bottom)}
 .tab-btn{flex:1;padding:8px 0;text-align:center;font-size:10px;color:var(--gray4);cursor:pointer;transition:color .15s;border:none;background:none;font-family:inherit}
 .tab-btn.active{color:var(--navy);font-weight:700}
@@ -405,9 +406,10 @@ body{font-family:'Noto Sans TC',sans-serif;background:#eef2f7;color:var(--gray6)
 </div>
 <div class="card">
 <div class="card-title">🔍 打卡查詢</div>
+<div style="display:flex;gap:6px;margin-bottom:8px"><button onclick="pqQuick('thisMonth')" style="flex:1;padding:7px 0;font-size:12px;border:1px solid var(--gray2);background:var(--card);border-radius:8px;cursor:pointer;color:var(--gray6)">本月</button><button onclick="pqQuick('lastMonth')" style="flex:1;padding:7px 0;font-size:12px;border:1px solid var(--gray2);background:var(--card);border-radius:8px;cursor:pointer;color:var(--gray6)">上月</button><button onclick="pqQuick('7d')" style="flex:1;padding:7px 0;font-size:12px;border:1px solid var(--gray2);background:var(--card);border-radius:8px;cursor:pointer;color:var(--gray6)">近7天</button></div>
 <div style="display:flex;gap:8px;margin-bottom:10px">
 <select class="fi" id="mgr-att-emp" style="flex:1"></select>
-<input class="fi" type="date" id="mgr-att-date" style="width:140px">
+<input class="fi" type="date" id="mgr-att-d1" style="flex:1;min-width:0"><span style="align-self:center;color:var(--gray4);font-weight:700">~</span><input class="fi" type="date" id="mgr-att-d2" style="flex:1;min-width:0">
 </div>
 <button class="btn btn-blue" onclick="mgrSearchPunch()" style="padding:10px;font-size:13px">🔍 查詢</button>
 <div id="mgr-punch-result" style="margin-top:10px"></div>
@@ -447,7 +449,7 @@ body{font-family:'Noto Sans TC',sans-serif;background:#eef2f7;color:var(--gray6)
 <button class="tab-btn prod-tab" onclick="switchScreen('prod')" id="tab-prod" style="display:none"><span class="icon">🏭</span>生產</button>
 <button class="tab-btn" onclick="switchScreen('sched')" id="tab-sched"><span class="icon">📅</span>班表</button>
 <button class="tab-btn" onclick="switchScreen('me')" id="tab-me"><span class="icon">👤</span>我的</button>
-<button class="tab-btn mgr-tab" onclick="switchScreen('approve')" id="tab-approve" style="display:none"><span class="icon">📋</span>審核</button>
+<button class="tab-btn mgr-tab" onclick="switchScreen('approve')" id="tab-approve" style="display:none;position:relative"><span class="icon">📋</span>審核<span id="appr-badge" class="appr-badge" style="display:none">0</span></button>
 <button class="tab-btn mgr-tab" onclick="switchScreen('attend')" id="tab-attend" style="display:none"><span class="icon">📊</span>出勤</button>
 <button class="tab-btn mgr-tab" onclick="switchScreen('report')" id="tab-report" style="display:none"><span class="icon">📈</span>報表</button>
 </div>
@@ -455,6 +457,11 @@ body{font-family:'Noto Sans TC',sans-serif;background:#eef2f7;color:var(--gray6)
 <script>
 
 window.onerror=function(msg,url,line,col,err){var entry={ts:new Date().toISOString(),msg:msg,line:line,col:col,src:'employee-app'};try{var log=JSON.parse(localStorage.getItem('hm_app_errors')||'[]');log.push(entry);if(log.length>30)log.shift();localStorage.setItem('hm_app_errors',JSON.stringify(log));if(db)db.collection(fbEnv+'_hrdata').doc('errorLog').get().then(function(doc){var data=doc.exists?doc.data().data||[]:[];data.push(entry);if(data.length>100)data=data.slice(-100);db.collection(fbEnv+'_hrdata').doc('errorLog').set({data:data}).catch(function(){})})}catch(e){}return false};
+window.addEventListener('unhandledrejection',function(ev){try{var m=(ev&&ev.reason&&(ev.reason.message||ev.reason))||'unhandledrejection';window.onerror('Promise\u672a\u6355\u6349: '+m,'',0,0,ev&&ev.reason)}catch(e){}});
+function _verNum(v){var p=String(v||'0').split('.');return(+p[0]||0)*1e6+(+p[1]||0)*1e3+(+p[2]||0)}
+function checkAppVer(){try{if(!db){setTimeout(checkAppVer,8000);return}db.collection(fbEnv+'_settings').doc('sysver').get().then(function(d){var cv=d.exists?(d.data().app||'0'):'0';if(_verNum(APP_VERSION)>_verNum(cv)){db.collection(fbEnv+'_settings').doc('sysver').set({app:APP_VERSION,appUpdated:new Date().toISOString()},{merge:true}).catch(function(){})}else if(_verNum(cv)>_verNum(APP_VERSION)){_showVerBanner(cv)}}).catch(function(){})}catch(e){}}
+function _showVerBanner(v){if(document.getElementById('sysver-banner'))return;var b=document.createElement('div');b.id='sysver-banner';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9999;background:#b45309;color:#fff;padding:8px 14px;font-size:13px;text-align:center;cursor:pointer';b.textContent='\ud83d\udd04 APP\u5df2\u767c\u5e03\u65b0\u7248 v'+v+'\uff08\u76ee\u524d v'+APP_VERSION+'\uff09\u2014 \u9ede\u6b64\u66f4\u65b0';b.onclick=function(){location.reload(true)};document.body.appendChild(b)}
+setTimeout(checkAppVer,9000);setInterval(checkAppVer,1800000);
 
 var _DEFAULT_FB={apiKey:'AIzaSyAk8D1oXTYaq9E1t96bPW-1rMu0EhW1JzQ',projectId:'haomin-system',authDomain:'haomin-system.firebaseapp.com',storageBucket:'haomin-system.firebasestorage.app',appId:'1:348193196599:web:a454b20e4145041e39cdb2'};
 var db=null,curEmp=null,curAcct=null,staff=[],sched={},leaveRecords=[],payHistory={},appSupportPay={},punchRecords=[],storeHours={'總公司':{lat:24.81472,lng:121.02525,radius:100},'交大店':{lat:24.78374,lng:120.99706,radius:200},'台積電店':{lat:24.76619,lng:121.00812,radius:1000}},fbEnv='prod';
@@ -469,7 +476,7 @@ function saveAppFb(){var k=document.getElementById('app-fb-key').value.trim();va
 
 function initFb(){var cfg=null;try{cfg=JSON.parse(localStorage.getItem('hm_app_fb'))}catch(e){}if(!cfg)return false;try{var app;try{app=firebase.app()}catch(e){app=firebase.initializeApp(cfg)}db=firebase.firestore();try{firebase.auth().signInAnonymously().catch(function(){})}catch(e){}return true}catch(e){return false}}
 
-function appLogin(){var u=document.getElementById('app-user').value.trim();var p=document.getElementById('app-pass').value;if(!u||!p){showErr('請輸入帳號和密碼');return}if(!db){var localAccts=JSON.parse(localStorage.getItem('hm_app_accounts')||'[]');var acct=localAccts.find(function(a){return a.user===u&&verifyPass(p,a.pass)});if(acct){if(acct.role==='已停用'){showErr('此帳號已停用（員工已離職）');return}finishLogin(acct);return}showErr('請先設定Firebase連線');return}db.collection(fbEnv+'_hrdata').doc('accounts').get().then(function(doc){if(!doc.exists){showErr('無法取得帳號資料');return}var accounts=doc.data().userAccounts||[];var acct=accounts.find(function(a){return a.user===u&&verifyPass(p,a.pass)});if(!acct){showErr('帳號或密碼錯誤');return}if(acct.role==='已停用'){showErr('此帳號已停用（員工已離職）');return}localStorage.setItem('hm_app_accounts',JSON.stringify(accounts));acct._plain=p;finishLogin(acct)}).catch(function(e){var localAccts=JSON.parse(localStorage.getItem('hm_app_accounts')||'[]');var acct=localAccts.find(function(a){return a.user===u&&verifyPass(p,a.pass)});if(acct){if(acct.role==='已停用'){showErr('此帳號已停用（員工已離職）');return}document.getElementById('offline-bar').style.display='block';finishLogin(acct)}else{showErr('連線失敗：'+e.message)}})}
+function appLogin(){var u=document.getElementById('app-user').value.trim();var p=document.getElementById('app-pass').value;if(!u||!p){showErr('請輸入帳號和密碼');return}if(!db){var localAccts=JSON.parse(localStorage.getItem('hm_app_accounts')||'[]');var acct=localAccts.find(function(a){return a.user===u&&verifyPass(p,a.pass)});if(acct){finishLogin(acct);return}showErr('請先設定Firebase連線');return}db.collection(fbEnv+'_hrdata').doc('accounts').get().then(function(doc){if(!doc.exists){showErr('無法取得帳號資料');return}var accounts=doc.data().userAccounts||[];var acct=accounts.find(function(a){return a.user===u&&verifyPass(p,a.pass)});if(!acct){showErr('帳號或密碼錯誤');return}localStorage.setItem('hm_app_accounts',JSON.stringify(accounts));acct._plain=p;finishLogin(acct)}).catch(function(e){var localAccts=JSON.parse(localStorage.getItem('hm_app_accounts')||'[]');var acct=localAccts.find(function(a){return a.user===u&&verifyPass(p,a.pass)});if(acct){document.getElementById('offline-bar').style.display='block';finishLogin(acct)}else{showErr('連線失敗：'+e.message)}})}
 
 function finishLogin(acct){renderAppVersion();curAcct=acct;if(document.getElementById('app-remember').checked){localStorage.setItem('hm_app_session',JSON.stringify({user:acct.user,pass:acct._plain||acct.pass}))}document.getElementById('login-screen').style.display='none';checkMgrRole();loadData();if(verifyPass(acct.user+'aa',acct.pass)){setTimeout(function(){if(confirm('⚠ 您目前使用預設密碼\n\n為保護帳號安全，建議立即修改密碼。\n\n按「確定」立即修改\n按「取消」稍後再改')){appChangePass()}},2000)}}
 
@@ -610,7 +617,7 @@ function resetPreLeave(){if(!curEmp||!db)return;var now=new Date();var nextM=now
 function checkPreLeaveReminder(){if(!curEmp||!db)return;var now=new Date();if(now.getDate()>10)return;var nextM=now.getMonth()+2;var nextY=now.getFullYear();if(nextM>12){nextM=1;nextY++}var mk=nextY+'-'+String(nextM).padStart(2,'0');db.collection(fbEnv+'_hrdata').doc('preLeave').get().then(function(doc){var data=doc.exists?doc.data().data||[]:[];var mine=data.find(function(p){return p.eid===curEmp.id&&p.month===mk});if(!mine){var daysLeft=10-now.getDate();var el=document.getElementById('preleave-remind');if(el)el.innerHTML='<div onclick="switchScreen(\'preleave\')" style="padding:14px;background:linear-gradient(135deg,#fee2e2,#fff1f2);border:2px solid #dc2626;border-radius:12px;margin-bottom:14px;cursor:pointer"><div style="font-size:14px;font-weight:700;color:#991b1b">🗓 劃休提醒</div><div style="font-size:12px;color:#991b1b;margin-top:4px">'+mk+' 尚未提交劃休申請</div><div style="font-size:12px;color:#dc2626;margin-top:2px">截止日剩 <b>'+daysLeft+'</b> 天，請盡快提交 →</div></div>'}}).catch(function(){})}
 
 
-function appAutoLogin(sess){if(!db){appLogin();return}db.collection(fbEnv+'_hrdata').doc('accounts').get().then(function(doc){if(!doc.exists){appLogin();return}var accounts=doc.data().userAccounts||[];var acct=accounts.find(function(a){return a.user===sess.user&&verifyPass(sess.pass,a.pass)});if(acct&&acct.role==='已停用'){localStorage.removeItem('hm_app_session');showErr('此帳號已停用（員工已離職）');return}if(acct){finishLogin(acct)}else{localStorage.removeItem('hm_app_session');document.getElementById('app-pass').value='';showErr('密碼已被管理端修改，請重新登入')}}).catch(function(){appLogin()})}
+function appAutoLogin(sess){if(!db){appLogin();return}db.collection(fbEnv+'_hrdata').doc('accounts').get().then(function(doc){if(!doc.exists){appLogin();return}var accounts=doc.data().userAccounts||[];var acct=accounts.find(function(a){return a.user===sess.user&&verifyPass(sess.pass,a.pass)});if(acct){finishLogin(acct)}else{localStorage.removeItem('hm_app_session');document.getElementById('app-pass').value='';showErr('密碼已被管理端修改，請重新登入')}}).catch(function(){appLogin()})}
 
 
 function renderOTChoices(){if(!curEmp||!db)return;db.collection(fbEnv+'_hrdata').doc('otRecords').get().then(function(doc){var data=doc.exists?doc.data().data||[]:[];var myOT=data.filter(function(r){return r.eid===curEmp.id&&r.status==='已核准'&&!r.payType});var el=document.getElementById('ot-choice-area');if(!el)return;if(myOT.length===0){el.innerHTML='';return}var h='';myOT.forEach(function(r){h+='<div style="padding:14px;background:linear-gradient(135deg,#dcfce7,#f0fdf4);border:2px solid #16a34a;border-radius:12px;margin-bottom:10px"><div style="font-size:14px;font-weight:700;color:#166534;margin-bottom:6px">✅ 加班已核准</div><div style="font-size:12px;color:#333;margin-bottom:8px">日期：'+r.date+' ｜ 時數：'+r.hours+'小時</div><div style="display:flex;gap:8px"><button onclick="appOTChoose(\''+r.id+'\',\'pay\')" style="flex:1;padding:12px;background:#0369a1;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">💰 領加班費</button><button onclick="appOTChoose(\''+r.id+'\',\'comp\')" style="flex:1;padding:12px;background:#7c3aed;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">🗓 換補休</button></div></div>'});el.innerHTML=h}).catch(function(){})}
@@ -638,14 +645,11 @@ function submitAppSurvey(sid){if(!db)return;var scores=[];var buttons=document.q
 function syncPunchFromFB(){if(!curEmp||!db)return;db.collection(fbEnv+'_hrdata').doc('punchRecords').get().then(function(doc){if(!doc.exists)return;var data=doc.data().data||[];var myToday=data.filter(function(r){var now=new Date();var today=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());return r.eid===curEmp.id&&r.date===today});if(myToday.length>0){var local=JSON.parse(localStorage.getItem('hm_app_punch')||'[]');myToday.forEach(function(r){if(!local.find(function(x){return x.id===r.id}))local.push(r)});localStorage.setItem('hm_app_punch',JSON.stringify(local));renderPunchToday()}}).catch(function(){})}
 
 
-var APP_VERSION='3.4.2';
-// ═══ 🔄 自動版本檢查(Phase1):每60分鐘比對線上版,有新版跳橫幅 ═══
-window._checkNewVersion=function(){try{fetch('index.html?_vchk='+Date.now(),{cache:'no-store'}).then(function(r){return r.text()}).then(function(t){var m=t.match(/APP_VERSION='([\d.]+)'/);if(m&&m[1]!==APP_VERSION&&!document.getElementById('ver-update-bar')){var bar=document.createElement('div');bar.id='ver-update-bar';bar.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;background:#f6ce37;color:#4c4948;font-weight:700;text-align:center;padding:10px;box-shadow:0 2px 8px rgba(0,0,0,.25);cursor:pointer;font-size:0.9rem';bar.innerHTML='🔄 系統有新版本 v'+m[1]+' — 點此立即更新';bar.onclick=function(){location.reload()};document.body.appendChild(bar)}}).catch(function(){})}catch(e){}};
-setTimeout(window._checkNewVersion,30000);setInterval(window._checkNewVersion,3600000);
-
+var APP_VERSION='3.8.0';
 var APP_CHANGELOG=[
-{ver:'3.4.2',date:'2026-07-06',changes:['【資安修補】離職員工(帳號已停用)無法再登入員工APP:線上登入/離線登入/自動登入三路徑全數攔截,自動登入偵測到停用會清除記憶登入']},
-{ver:'3.4.1',date:'2026-07-06',changes:['【Phase1資安】自動版本檢查:發現新版跳出更新橫幅,點擊立即更新']},
+{ver:'3.8.0',date:'2026-07-05',note:'打卡查詢新增快捷範圍鈕:一鍵「本月/上月/近7天」自動帶入起訖並查詢，仍可手動選自訂區間。搭配v3.6區間查詢,整月或任意期間出勤一鍵可得'},
+{ver:'3.7.0',date:'2026-07-05',note:'審核分頁新增待辦紅點徽章：待審核事項(請假/加班/換班/劃休/補打卡)總數以紅色圓點顯示於「審核」選項右上，數字即時反映待處理量(>99顯示99+)，每60秒自動刷新、審核後自動更新，0筆時隱藏'},
+{ver:'3.6.0',date:'2026-07-05',note:'打卡查詢改為日期區間查詢(起~訖)：可查一段期間出勤，結果按日分組(含星期)並顯示天數/筆數摘要，起訖顛倒自動校正，預設本月1日至今'},
 {ver:'3.3.0',date:'2026-06-07',changes:['【新功能·叫貨】首頁新增「🛒 叫貨」：自動帶出您所屬門市的叫貨連結（一鍵開啟對應叫貨系統），下方並列各店叫貨連結可切換','目前已設定：交大店→義早交大店、台積電店→咕咕台積電；其餘門市待設定']},
 {ver:'3.2.0',date:'2026-06-07',changes:['【新功能·跨店支援時薪】若您是月薪員工、到別家店以時薪支援，薪資頁下方會新增「🤝跨店支援時薪」區塊，依月份/店別顯示日期、時數、時薪、工資與小計','說明：支援時薪為本店月薪之外的額外工資；勞健保已於本店主單投保不重複扣繳，所得稅併入主單歸戶。由管理端登錄後顯示']},
 {ver:'3.1.3',date:'2026-06-07',changes:['【重大修正：打卡遺失】打卡寫入由「整包讀取再覆寫」改為 arrayUnion 原子追加，解決多人同時打卡互相覆蓋導致紀錄消失的問題；離線補傳同步亦改原子追加','【GPS 容忍】打卡範圍判定納入手機 GPS 誤差(accuracy)容忍(上限150m)，解決同一地點時可打時不可打；超出範圍時提示會顯示目前距離與GPS誤差']},
@@ -722,7 +726,12 @@ function checkMgrRole(){
   var tabs=document.querySelectorAll('.mgr-tab');
   var show=mgrRole==='老闆'||mgrRole==='店長';
   tabs.forEach(function(t){t.style.display=show?'':'none'});
+  if(show)startApproveBadgePolling();
 }
+
+function setApproveBadge(n){var b=document.getElementById('appr-badge');if(!b)return;if(n>0){b.textContent=n>99?'99+':String(n);b.style.display='inline-flex';}else{b.style.display='none';}}
+function updateApproveBadge(){if(!db||!mgrRole)return;var col=db.collection(fbEnv+'_hrdata');Promise.all([col.doc('leave').get(),col.doc('otRecords').get(),col.doc('swapRecords').get(),col.doc('preLeave').get(),col.doc('punchApplies').get()]).then(function(rs){var n=0;var lv=rs[0].exists?(rs[0].data().leaveRecords||[]):[];n+=lv.filter(function(x){return x.status==='待簽核'||x.status==='店長核准'}).length;[1,2,3,4].forEach(function(i){var d=rs[i].exists?(rs[i].data().data||[]):[];n+=d.filter(function(x){return x.status==='待審核'}).length;});setApproveBadge(n);}).catch(function(){});}
+var _apprTimer=null;function startApproveBadgePolling(){if(_apprTimer)return;updateApproveBadge();_apprTimer=setInterval(function(){if(mgrRole)updateApproveBadge();else{clearInterval(_apprTimer);_apprTimer=null;}},60000);}
 
 function loadMgrApprove(){
   if(!db||!mgrRole)return;
@@ -784,7 +793,7 @@ function loadMgrApprove(){
     }
     
     if(!h)h='<div style="text-align:center;padding:30px;color:var(--gray4)">✅ 目前沒有待審核事項</div>';
-    document.getElementById('mgr-approve-list').innerHTML=h;
+    document.getElementById('mgr-approve-list').innerHTML=h;updateApproveBadge();
   }).catch(function(e){
     document.getElementById('mgr-approve-list').innerHTML='<div style="color:var(--red);padding:10px">載入失敗：'+e.message+'</div>';
   });
@@ -810,7 +819,7 @@ function mgrRejectMakeup(id){var reason=prompt('拒絕原因：');if(!reason)ret
 function loadMgrAttend(){
   if(!db)return;
   var today=new Date().toISOString().substring(0,10);
-  document.getElementById('mgr-att-date').value=today;
+  var _t=new Date();var _m1=_t.getFullYear()+'-'+String(_t.getMonth()+1).padStart(2,'0')+'-01';document.getElementById('mgr-att-d1').value=_m1;document.getElementById('mgr-att-d2').value=today;
   var sel=document.getElementById('mgr-att-emp');
   sel.innerHTML='<option value="">全部員工</option>';
   staff.forEach(function(e){if(!e.leave_date)sel.innerHTML+='<option value="'+e.id+'">'+e.name+'</option>'});
@@ -866,22 +875,33 @@ function loadMgrAttend(){
   }).catch(function(){});
 }
 
+function pqQuick(type){var t=new Date(),y=t.getFullYear(),m=t.getMonth();function _f(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}var d1,d2;if(type==='thisMonth'){d1=new Date(y,m,1);d2=t;}else if(type==='lastMonth'){d1=new Date(y,m-1,1);d2=new Date(y,m,0);}else if(type==='7d'){d1=new Date(t);d1.setDate(t.getDate()-6);d2=t;}else{return;}document.getElementById('mgr-att-d1').value=_f(d1);document.getElementById('mgr-att-d2').value=_f(d2);mgrSearchPunch();}
+
 function mgrSearchPunch(){
   var eid=document.getElementById('mgr-att-emp').value;
-  var date=document.getElementById('mgr-att-date').value;
-  if(!date){alert('請選擇日期');return}
+  var d1=document.getElementById('mgr-att-d1').value;
+  var d2=document.getElementById('mgr-att-d2').value;
+  if(!d1||!d2){alert('請選擇起訖日期');return}
+  if(d1>d2){var _tmp=d1;d1=d2;d2=_tmp;document.getElementById('mgr-att-d1').value=d1;document.getElementById('mgr-att-d2').value=d2;}
   db.collection(fbEnv+'_hrdata').doc('punchRecords').get().then(function(doc){
     var data=doc.exists?doc.data().data||[]:[];
     var filtered=data.filter(function(r){
       if(eid&&r.eid!==eid)return false;
-      return r.date===date;
+      return r.date>=d1&&r.date<=d2;
     });
+    filtered.sort(function(x,y){return (x.date+(x.time||'')).localeCompare(y.date+(y.time||''))});
     var h='';
-    if(filtered.length===0){h='<div style="text-align:center;padding:16px;color:var(--gray4)">無紀錄</div>'}
-    filtered.forEach(function(r){
-      var tc=r.type==='上班'?'#166534':r.type==='下班'?'#991b1b':'#92400e';
-      h+='<div style="display:flex;align-items:center;padding:6px 0;border-bottom:1px solid var(--gray1);font-size:12px"><span style="min-width:60px;font-weight:700">'+r.name+'</span><span style="padding:2px 8px;background:#f0f0f0;border-radius:4px;color:'+tc+';font-weight:700;font-size:11px;min-width:50px;text-align:center">'+r.type+'</span><span style="font-family:JetBrains Mono,monospace;font-weight:700;margin-left:8px">'+r.time.substring(0,5)+'</span></div>';
-    });
+    if(filtered.length===0){h='<div style="text-align:center;padding:16px;color:var(--gray4)">此區間無打卡紀錄</div>'}
+    else{
+      var days={};filtered.forEach(function(r){days[r.date]=1});
+      h+='<div style="display:flex;justify-content:space-between;padding:6px 8px;background:var(--gray1);border-radius:6px;font-size:11px;color:var(--gray5);margin-bottom:8px"><span>'+d1+' ~ '+d2+'</span><span style="font-weight:700">'+Object.keys(days).length+' 天 · '+filtered.length+' 筆</span></div>';
+      var lastDate='';
+      filtered.forEach(function(r){
+        if(r.date!==lastDate){var _d=new Date(r.date+'T00:00:00');var _w=['日','一','二','三','四','五','六'][_d.getDay()];h+='<div style="font-size:11px;font-weight:700;color:var(--gray5);margin:8px 0 2px;padding-top:6px;border-top:1px dashed var(--gray2)">'+r.date+' ('+_w+')</div>';lastDate=r.date;}
+        var tc=r.type==='上班'?'#166534':r.type==='下班'?'#991b1b':'#92400e';
+        h+='<div style="display:flex;align-items:center;padding:6px 0;border-bottom:1px solid var(--gray1);font-size:12px"><span style="min-width:60px;font-weight:700">'+r.name+'</span><span style="padding:2px 8px;background:#f0f0f0;border-radius:4px;color:'+tc+';font-weight:700;font-size:11px;min-width:50px;text-align:center">'+r.type+'</span><span style="font-family:JetBrains Mono,monospace;font-weight:700;margin-left:8px">'+(r.time||'').substring(0,5)+'</span></div>';
+      });
+    }
     document.getElementById('mgr-punch-result').innerHTML=h;
   }).catch(function(e){alert('查詢失敗：'+e.message)});
 }
