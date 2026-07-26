@@ -129,6 +129,7 @@ body{font-family:'Noto Sans TC',sans-serif;background:#eef2f7;color:var(--gray6)
 <div class="stat"><div class="stat-val" style="color:#0369a1" id="home-vac">─</div><div class="stat-label">特休餘額(天)</div></div>
 <div class="stat"><div class="stat-val" style="color:#166534" id="home-attend">─</div><div class="stat-label">本月出勤(天)</div></div>
 </div>
+<div id="app-daily-record"></div>
 <div id="preleave-remind"></div>
 <div id="app-survey-area"></div>
 <div id="ot-choice-area"></div>
@@ -464,7 +465,7 @@ function _showVerBanner(v){if(document.getElementById('sysver-banner'))return;va
 setTimeout(checkAppVer,9000);setInterval(checkAppVer,1800000);
 
 var _DEFAULT_FB={apiKey:'AIzaSyAk8D1oXTYaq9E1t96bPW-1rMu0EhW1JzQ',projectId:'haomin-system',authDomain:'haomin-system.firebaseapp.com',storageBucket:'haomin-system.firebasestorage.app',appId:'1:348193196599:web:a454b20e4145041e39cdb2'};
-var db=null,curEmp=null,curAcct=null,staff=[],sched={},leaveRecords=[],payHistory={},appSupportPay={},punchRecords=[],storeHours={'總公司':{lat:24.81472,lng:121.02525,radius:100},'交大店':{lat:24.78374,lng:120.99706,radius:200},'台積電店':{lat:24.76619,lng:121.00812,radius:1000}},fbEnv='prod';
+var db=null,curEmp=null,curAcct=null,staff=[],sched={},leaveRecords=[],payHistory={},appSupportPay={},punchRecords=[],storeHours={'總公司':{lat:24.81472,lng:121.02525,radius:200},'交大店':{lat:24.78374,lng:120.99706,radius:200},'台積電店':{lat:24.76619,lng:121.00812,radius:1000}},STORE_GEO={'總公司':{lat:24.81472,lng:121.02525,radius:200},'交大店':{lat:24.78374,lng:120.99706,radius:200},'台積電店':{lat:24.76619,lng:121.00812,radius:1000}},fbEnv='prod';
 var viewY=new Date().getFullYear()-1911,viewM=new Date().getMonth()+1;
 function pad(n){return String(n).padStart(2,'0')}
 function fNT(v){return'NT$'+Math.round(v).toLocaleString()}
@@ -488,49 +489,24 @@ function loadData(){if(!db){renderAll();return}db.collection(fbEnv+'_employees')
 function findCurEmp(){if(curAcct&&curAcct.empId){curEmp=staff.find(function(e){return e.id===curAcct.empId})}if(!curEmp&&staff.length){curEmp=staff[0]}}
 
 function goMakeup(){switchScreen('punch');setTimeout(function(){var el=document.getElementById('app-makeup-date');if(el&&el.scrollIntoView)el.scrollIntoView({behavior:'smooth',block:'center'})},350)}
-function switchScreen(name){document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active')});document.querySelectorAll('.tab-btn').forEach(function(t){t.classList.remove('active')});var _sc=document.getElementById('screen-'+name);if(_sc)_sc.classList.add('active');var _tb=document.getElementById('tab-'+name);if(_tb)_tb.classList.add('active');try{window.scrollTo(0,0)}catch(e){}if(name==='order')renderOrder();if(name==='home'&&typeof loadEmpStats==='function')loadEmpStats();if(name==='prod'){refreshProdData()}if(name==='approve')loadMgrApprove();if(name==='attend')loadMgrAttend();if(name==='report')loadMgrReport();if(name==='punch')initPunchScreen();if(name==='sched'){if(schedViewMode==='store')renderSchedStore();else renderSched()}if(name==='leave')renderLeave();if(name==='pay')renderPay();if(name==='me')renderMe();if(name==='preleave')renderPreLeave();if(name==='swap')openAppSwap();if(name==='sop'){}}
+function switchScreen(name){if(name!=='punch'&&typeof _stopGPS==='function')_stopGPS();document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active')});document.querySelectorAll('.tab-btn').forEach(function(t){t.classList.remove('active')});var _sc=document.getElementById('screen-'+name);if(_sc)_sc.classList.add('active');var _tb=document.getElementById('tab-'+name);if(_tb)_tb.classList.add('active');try{window.scrollTo(0,0)}catch(e){}if(name==='order')renderOrder();if(name==='home'&&typeof loadEmpStats==='function')loadEmpStats();if(name==='home'){try{HaomingAppDailyRecord.render()}catch(e){}}if(name==='prod'){refreshProdData()}if(name==='approve')loadMgrApprove();if(name==='attend')loadMgrAttend();if(name==='report')loadMgrReport();if(name==='punch')initPunchScreen();if(name==='sched'){if(schedViewMode==='store')renderSchedStore();else renderSched()}if(name==='leave')renderLeave();if(name==='pay')renderPay();if(name==='me')renderMe();if(name==='preleave')renderPreLeave();if(name==='swap')openAppSwap();if(name==='sop'){}}
 
-function renderAll(){if(!curEmp){document.getElementById('home-name').textContent='未綁定員工';return}document.getElementById('app-name').textContent=curEmp.name;document.getElementById('app-role').textContent=curEmp.role+' · '+(curEmp.store||'');document.getElementById('home-avatar').textContent=curEmp.name[0];document.getElementById('home-name').textContent=curEmp.name;document.getElementById('home-sub').textContent=curEmp.role+' · '+(curEmp.store||'')+' · 到職 '+(curEmp.hire_date||'─');document.getElementById('home-vac').textContent='─';document.getElementById('home-attend').textContent='─'}
+function renderAll(){if(!curEmp){document.getElementById('home-name').textContent='未綁定員工';return}document.getElementById('app-name').textContent=curEmp.name;document.getElementById('app-role').textContent=curEmp.role+' · '+(curEmp.store||'');document.getElementById('home-avatar').textContent=curEmp.name[0];document.getElementById('home-name').textContent=curEmp.name;document.getElementById('home-sub').textContent=curEmp.role+' · '+(curEmp.store||'')+' · 到職 '+(curEmp.hire_date||'─');document.getElementById('home-vac').textContent='─';document.getElementById('home-attend').textContent='─';try{HaomingAppDailyRecord.render()}catch(e){}}
 
-function initPunchScreen(){var ps=document.getElementById('p-store');if(ps&&curEmp&&curEmp.store){ps.value=curEmp.store};syncPunchFromFB();updateClock();if(window._pt)clearInterval(window._pt);window._pt=setInterval(updateClock,1000);getGPS();renderPunchToday();loadMakeupHistory()}
+function initPunchScreen(){syncStoreHours();var ps=document.getElementById('p-store');if(ps&&curEmp&&curEmp.store){ps.value=curEmp.store};syncPunchFromFB();updateClock();if(window._pt)clearInterval(window._pt);window._pt=setInterval(updateClock,1000);getGPS();renderPunchToday();loadMakeupHistory()}
 
 function updateClock(){var n=new Date();document.getElementById('p-clock').textContent=pad(n.getHours())+':'+pad(n.getMinutes())+':'+pad(n.getSeconds());document.getElementById('p-date').textContent=n.getFullYear()+'/'+pad(n.getMonth()+1)+'/'+pad(n.getDate())+' ('+DOW[n.getDay()]+')';}
 
 var _lat=null,_lng=null,_gpsAcc=null;
-function getGPS(){
-  var el=document.getElementById('p-gps');
-  _lat=null;_lng=null;
-  if(!navigator.geolocation){el.textContent='📍 不支援GPS，無法打卡';el.style.color='#991b1b';return}
-  el.innerHTML='📍 定位中... <span style="font-size:10px;color:#666">(請確認瀏覽器已允許定位)</span>';
-  function onSuccess(pos){
-    _lat=pos.coords.latitude;_lng=pos.coords.longitude;_gpsAcc=pos.coords.accuracy;
-    var selStore=document.getElementById('p-store');
-    var sh=selStore?storeHours[selStore.value]:null;
-    if(sh&&sh.lat){
-      var d=gpsDist(_lat,_lng,sh.lat,sh.lng);
-      var ok=d<=(sh.radius||200)+Math.min(_gpsAcc||0,150);
-      el.innerHTML='📍 '+(ok?'<span style="color:#166534">✅ 門市範圍內 ('+Math.round(d)+'m)</span>':'<span style="color:#991b1b">⚠ 不在門市範圍 ('+Math.round(d)+'m)</span>');
-      el.style.background=ok?'#dcfce7':'#fee2e2';
-    }else{
-      el.textContent='📍 '+_lat.toFixed(5)+', '+_lng.toFixed(5);
-    }
-  }
-  function onFail(err){
-    if(err.code===1){
-      el.innerHTML='📍 <span style="color:#991b1b">定位被拒絕</span><br><span style="font-size:11px;color:#666">請到手機設定 → 瀏覽器 → 允許定位權限</span><br><button onclick="getGPS()" style="margin-top:4px;padding:4px 12px;background:#2563eb;color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer">🔄 重試</button>';
-    }else{
-      el.innerHTML='📍 <span style="color:#92400e">定位中（第二次嘗試...）</span>';
-      navigator.geolocation.getCurrentPosition(onSuccess,function(){
-        el.innerHTML='📍 <span style="color:#991b1b">無法定位</span><br><span style="font-size:11px;color:#666">請確認：①手機定位已開啟 ②瀏覽器有定位權限 ③非飛航模式</span><br><button onclick="getGPS()" style="margin-top:4px;padding:4px 12px;background:#2563eb;color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer">🔄 重試</button>';
-      },{enableHighAccuracy:false,timeout:15000,maximumAge:30000});
-    }
-  }
-  navigator.geolocation.getCurrentPosition(onSuccess,onFail,{enableHighAccuracy:true,timeout:10000,maximumAge:0});
-}
+function _updateGpsUI(){var el=document.getElementById('p-gps');if(!el||_lat===null||_lat===undefined)return;var selStore=document.getElementById('p-store');var sh=selStore?storeHours[selStore.value]:null;if(sh&&sh.lat){var d=gpsDist(_lat,_lng,sh.lat,sh.lng);var tol=(_gpsAcc||0);var inR=d<=((sh.radius||200)+tol);var weak=((_gpsAcc||0)>500);el.innerHTML='\uD83D\uDCCD '+(inR?'<span style="color:#166534">\u2705 \u9580\u5e02\u7bc4\u570d\u5185 ('+Math.round(d)+'m\uff0c\u8aa4\u5dee\u00b1'+Math.round(_gpsAcc||0)+'m)</span>':'<span style="color:#991b1b">\u26a0 \u4e0d\u5728\u9580\u5e02\u7bc4\u570d ('+Math.round(d)+'m\uff0c\u8aa4\u5dee\u00b1'+Math.round(_gpsAcc||0)+'m)</span>')+(weak?'<br><span style="font-size:10px;color:#92400e">\u5b9a\u4f4d\u8aa4\u5dee\u504f\u5927\uff0c\u6301\u7e8c\u6821\u6b63\u4e2d\u2026\u82e5\u6253\u5361\u5c07\u6a19\u8a18\u5f85\u78ba\u8a8d</span>':'');el.style.background=inR?'#dcfce7':'#fee2e2'}else{el.textContent='\uD83D\uDCCD '+_lat.toFixed(5)+', '+_lng.toFixed(5)+'\uff08\u8aa4\u5dee\u00b1'+Math.round(_gpsAcc||0)+'m\uff09'}}
+function _stopGPS(){if(window._gpsWatch!==undefined&&window._gpsWatch!==null){try{navigator.geolocation.clearWatch(window._gpsWatch)}catch(e){}window._gpsWatch=null}}
+function getGPS(){var el=document.getElementById('p-gps');_lat=null;_lng=null;_gpsAcc=null;_stopGPS();if(!navigator.geolocation){if(el){el.innerHTML='\uD83D\uDCCD <span style="color:#92400e">\u6b64\u88dd\u7f6e\u4e0d\u652f\u63f4\u5b9a\u4f4d</span><br><span style="font-size:11px;color:#666">\u4ecd\u53ef\u6253\u5361\uff0c\u5c07\u6a19\u8a18\u300c\u7121\u5b9a\u4f4d\u30fb\u5f85\u78ba\u8a8d\u300d</span>'}return}if(el){el.innerHTML='\uD83D\uDCCD \u5b9a\u4f4d\u4e2d\u2026 <span style="font-size:10px;color:#666">(\u6301\u7e8c\u6821\u6b63\uff0c\u7a0d\u7b49\u6703\u66f4\u7cbe\u6e96)</span>';el.style.background='#f1f5f9'}function ok(pos){var acc=pos.coords.accuracy||9999;if(_lat!==null&&_gpsAcc!==null&&acc>_gpsAcc)return;_lat=pos.coords.latitude;_lng=pos.coords.longitude;_gpsAcc=acc;_updateGpsUI()}function fail(err){var btn='<br><button onclick="getGPS()" style="margin-top:4px;padding:4px 12px;background:#2563eb;color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer">\uD83D\uDD04 \u91cd\u8a66</button>';if(err&&err.code===1){_stopGPS();if(el)el.innerHTML='\uD83D\uDCCD <span style="color:#991b1b">\u5b9a\u4f4d\u88ab\u62d2\u7d55</span><br><span style="font-size:11px;color:#666">\u8acb\u5230\u624b\u6a5f\u8a2d\u5b9a\u2192\u700f\u89bd\u5668\u2192\u5141\u8a31\u5b9a\u4f4d\uff1b\u4ecd\u53ef\u6253\u5361(\u6a19\u8a18\u5f85\u78ba\u8a8d)</span>'+btn;return}if(_lat===null&&el)el.innerHTML='\uD83D\uDCCD <span style="color:#92400e">\u8a0a\u865f\u8f03\u5f31\uff0c\u5b9a\u4f4d\u4e2d\u2026</span><br><span style="font-size:11px;color:#666">\u4ecd\u53ef\u6253\u5361\uff0c\u5c07\u6a19\u8a18\u300c\u7121\u5b9a\u4f4d\u30fb\u5f85\u78ba\u8a8d\u300d</span>'+btn}window._gpsWatch=navigator.geolocation.watchPosition(ok,fail,{enableHighAccuracy:true,timeout:20000,maximumAge:0})}
 
+function _mergeStoreGeo(src){var out={};Object.keys(STORE_GEO).forEach(function(s){var g=STORE_GEO[s],t=(src&&src[s])||{};out[s]={lat:(t.lat!==undefined&&t.lat!==null)?t.lat:g.lat,lng:(t.lng!==undefined&&t.lng!==null)?t.lng:g.lng,radius:(+t.radius>0)?+t.radius:g.radius,oh:t.oh,om:t.om,ch:t.ch,cm:t.cm}});if(src)Object.keys(src).forEach(function(s){if(!out[s])out[s]=src[s]});return out}
+function syncStoreHours(){try{var c=localStorage.getItem('hm_storeHours');if(c)storeHours=_mergeStoreGeo(JSON.parse(c))}catch(e){}if(!db||!navigator.onLine)return;db.collection(fbEnv+'_hrdata').doc('storeHours').get().then(function(doc){if(!doc.exists)return;var d=doc.data().data;if(!d)return;storeHours=_mergeStoreGeo(d);try{localStorage.setItem('hm_storeHours',JSON.stringify(storeHours))}catch(e){}if(typeof _updateGpsUI==='function')_updateGpsUI()}).catch(function(){})}
 function gpsDist(a,b,c,d){var R=6371000,dL=(c-a)*Math.PI/180,dN=(d-b)*Math.PI/180,x=Math.sin(dL/2)*Math.sin(dL/2)+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dN/2)*Math.sin(dN/2);return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x))}
 
-function appPunch(type){if(!curEmp){alert('未綁定員工');return}/* device binding removed */var pStore=document.getElementById('p-store');if(!pStore||!pStore.value){alert('請先選擇打卡門市');return}if(!_lat||!_lng){alert('📍 請開啟手機定位功能\n\n打卡需要 GPS 定位確認您在門市範圍內');return}var _psh=storeHours[pStore.value];if(!_psh){alert('門市設定錯誤');return}var _pd=gpsDist(_lat,_lng,_psh.lat,_psh.lng);var _tol=Math.min(_gpsAcc||0,150);if(_pd>_psh.radius+_tol){alert('⚠ 不在「'+pStore.value+'」範圍內\n\n目前距離：'+Math.round(_pd)+'m（GPS誤差±'+Math.round(_gpsAcc||0)+'m）\n允許範圍：'+_psh.radius+'m\n\n請在門市範圍內、或於空曠處待定位精準後再打卡');return}/* PIN已取消 */var now=new Date();var today=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());var time=pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds());var rec={id:'p'+Date.now(),eid:curEmp.id,name:curEmp.name,store:(pStore?pStore.value:curEmp.store)||'',date:today,time:time,type:type,gps:_lat?(_lat.toFixed(5)+','+_lng.toFixed(5)):'無定位',ts:now.toISOString()};var local=JSON.parse(localStorage.getItem('hm_app_punch')||'[]');local.push(rec);localStorage.setItem('hm_app_punch',JSON.stringify(local));if(db&&navigator.onLine){db.collection(fbEnv+'_hrdata').doc('punchRecords').set({data:firebase.firestore.FieldValue.arrayUnion(rec)},{merge:true}).catch(function(e){saveOfflinePunch(rec)})}else{saveOfflinePunch(rec)}var res=document.getElementById('p-result');res.style.display='block';var tc=type==='上班'?'#166534':type==='下班'?'#991b1b':type==='外出'?'#92400e':'#0369a1';var bg=type==='上班'?'#dcfce7':type==='下班'?'#fee2e2':type==='外出'?'#fef3c7':'#e0f2fe';res.style.background=bg;res.style.color=tc;res.innerHTML='<div style="font-size:28px;margin-bottom:4px">'+(type==='上班'?'☀':type==='下班'?'🌙':type==='外出'?'🚶':'🏢')+'</div><div style="font-size:20px;font-weight:700">'+type+'打卡成功</div><div style="font-size:24px;font-weight:700;font-family:JetBrains Mono,monospace;margin-top:4px">'+time+'</div>';renderPunchToday()}
+function appPunch(type){if(!curEmp){alert('未綁定員工');return}/* device binding removed */var pStore=document.getElementById('p-store');if(!pStore||!pStore.value){alert('請先選擇打卡門市');return}var _noGps=(!_lat||!_lng);if(_noGps){if(!confirm('\u26a0 \u76ee\u524d\u7121\u6cd5\u53d6\u5f97\u5b9a\u4f4d\n\n\u662f\u5426\u4ecd\u8981\u6253\u5361\uff1f\n\u6b64\u7b46\u5c07\u6a19\u8a18\u300c\u7121\u5b9a\u4f4d\u30fb\u5f85\u78ba\u8a8d\u300d\uff0c\u7531\u4e3b\u7ba1\u6838\u5c0d'))return}var _psh=storeHours[pStore.value]||STORE_GEO[pStore.value];if(!_psh){alert('門市設定錯誤');return}var _pd=null;if(!_noGps&&_psh.lat){_pd=gpsDist(_lat,_lng,_psh.lat,_psh.lng);var _tol=(_gpsAcc||0);if(_pd>((_psh.radius||200)+_tol)){alert('\u26a0 \u4e0d\u5728\u300c'+pStore.value+'\u300d\u7bc4\u570d\u5185\n\n\u76ee\u524d\u8ddd\u96e2\uff1a'+Math.round(_pd)+'m\uff08GPS\u8aa4\u5dee\u00b1'+Math.round(_gpsAcc||0)+'m\uff09\n\u5141\u8a31\u7bc4\u570d\uff1a'+(_psh.radius||200)+'m\n\n\u8acb\u5728\u9580\u5e02\u7bc4\u570d\u5185\u3001\u6216\u65bc\u7a7a\u66e0\u8655\u5f85\u5b9a\u4f4d\u7cbe\u6e96\u5f8c\u518d\u6253\u5361');return}}/* PIN已取消 */var now=new Date();var today=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());var time=pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds());var rec={id:'p'+Date.now(),eid:curEmp.id,name:curEmp.name,store:(pStore?pStore.value:curEmp.store)||'',date:today,time:time,type:type,gps:_lat?(_lat.toFixed(5)+','+_lng.toFixed(5)):'無定位',acc:(_gpsAcc?Math.round(_gpsAcc):null),dist:(_pd!==null&&_pd!==undefined?Math.round(_pd):null),needChk:(_noGps||(_gpsAcc||0)>500),ts:now.toISOString()};var local=JSON.parse(localStorage.getItem('hm_app_punch')||'[]');local.push(rec);localStorage.setItem('hm_app_punch',JSON.stringify(local));if(db&&navigator.onLine){db.collection(fbEnv+'_hrdata').doc('punchRecords').set({data:firebase.firestore.FieldValue.arrayUnion(rec)},{merge:true}).catch(function(e){saveOfflinePunch(rec)})}else{saveOfflinePunch(rec)}var res=document.getElementById('p-result');res.style.display='block';var tc=type==='上班'?'#166534':type==='下班'?'#991b1b':type==='外出'?'#92400e':'#0369a1';var bg=type==='上班'?'#dcfce7':type==='下班'?'#fee2e2':type==='外出'?'#fef3c7':'#e0f2fe';res.style.background=bg;res.style.color=tc;res.innerHTML='<div style="font-size:28px;margin-bottom:4px">'+(type==='上班'?'☀':type==='下班'?'🌙':type==='外出'?'🚶':'🏢')+'</div><div style="font-size:20px;font-weight:700">'+type+'打卡成功</div><div style="font-size:24px;font-weight:700;font-family:JetBrains Mono,monospace;margin-top:4px">'+time+'</div>';renderPunchToday()}
 
 function renderPunchToday(){var now=new Date();var today=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());var local=JSON.parse(localStorage.getItem('hm_app_punch')||'[]');var recs=local.filter(function(r){return r.eid===(curEmp?curEmp.id:'')&&r.date===today}).sort(function(a,b){return a.time>b.time?1:-1});var h='';if(!recs.length)h='<div style="text-align:center;padding:16px;color:var(--gray4)">今日尚無打卡紀錄</div>';recs.forEach(function(r){var tc=r.type==='上班'?'#166534':r.type==='下班'?'#991b1b':r.type==='外出'?'#92400e':'#0369a1';var bg=r.type==='上班'?'#dcfce7':r.type==='下班'?'#fee2e2':r.type==='外出'?'#fef3c7':'#e0f2fe';h+='<div class="punch-row"><span style="background:'+bg+';color:'+tc+';padding:3px 10px;border-radius:8px;font-weight:700;font-size:12px;min-width:50px;text-align:center">'+r.type+'</span><span style="font-family:JetBrains Mono,monospace;font-weight:700;font-size:16px;margin-left:auto">'+r.time+'</span></div>'});document.getElementById('p-today').innerHTML=h}
 
@@ -645,8 +621,10 @@ function submitAppSurvey(sid){if(!db)return;var scores=[];var buttons=document.q
 function syncPunchFromFB(){if(!curEmp||!db)return;db.collection(fbEnv+'_hrdata').doc('punchRecords').get().then(function(doc){if(!doc.exists)return;var data=doc.data().data||[];var myToday=data.filter(function(r){var now=new Date();var today=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());return r.eid===curEmp.id&&r.date===today});if(myToday.length>0){var local=JSON.parse(localStorage.getItem('hm_app_punch')||'[]');myToday.forEach(function(r){if(!local.find(function(x){return x.id===r.id}))local.push(r)});localStorage.setItem('hm_app_punch',JSON.stringify(local));renderPunchToday()}}).catch(function(){})}
 
 
-var APP_VERSION='3.8.0';
+var APP_VERSION='3.10.0';
 var APP_CHANGELOG=[
+{ver:'3.10.0',date:'2026-07-26',changes:['【新增·首頁「今日紀錄」卡片】顯示今日已登錄品項數、銷售/報廢/員餐份數、臨辦與櫃位是否完成、店長是否已覆核，另附本週登錄狀況條（綠=已覆核/黃=未覆核/灰=無資料）。只顯示自己所屬門市，未啟用數量錄入的門市不顯示此卡','【設計原則·刻意不顯示金額】卡片一律不顯示單位成本、耗損金額、員工餐金額與短少數量。短少為推估值且成因多為登錄疏漏、找錯錢、試吃未登記，直接公告易被誤讀為指控並造成互相猜忌；報廢改以「正常/偏高」燈號取代百分比，避免員工去猜門檻把數字做漂亮','【資安·實體隔離】卡片僅讀 finance/{月}/stores/{門市}/salesQty（數量層），完全不觸及 catalog/costs 與 recon（成本與勾稽結果）。員工端即使開發者工具檢視網路請求也拿不到成本資料，非僅前端隱藏']},
+{ver:'3.9.0',date:'2026-07-26',changes:['【根本修正·打卡圍籬改由管理端同步】APP原將門市座標與圍籬半徑寫死(總公司僅100m、與管理端設定的200m不符),且完全未同步管理端設定,老闆調整圍籬永遠不生效,是員工時常無法打卡的主因。現改為自動同步管理端設定(含localStorage快取,離線也能用),缺漏欄位以內建基準補齊','【改善·GPS改為持續校正】原僅定位一次,首次定位不準就被凍結在錯誤座標;現改為持續校正並自動採用最精準的一次定位,室內定位隨時間收斂,大幅減少「明明在店裡卻說不在範圍」','【改善·GPS誤差容忍改為動態】原容忍上限固定150m,室內誤差常達200~500m導致誤擋;現改為「圍籬半徑＋實際定位誤差」動態判定,並顯示目前誤差值','【新增·無定位時仍可打卡(標記待確認)】定位被拒絕、訊號不足或裝置不支援時,確認後仍可打卡,該筆標記「無定位・待確認」並記錄定位誤差供主管核對,不再完全打不了卡','【改善·離開打卡頁自動停止定位】節省手機電量']},
 {ver:'3.8.0',date:'2026-07-05',note:'打卡查詢新增快捷範圍鈕:一鍵「本月/上月/近7天」自動帶入起訖並查詢，仍可手動選自訂區間。搭配v3.6區間查詢,整月或任意期間出勤一鍵可得'},
 {ver:'3.7.0',date:'2026-07-05',note:'審核分頁新增待辦紅點徽章：待審核事項(請假/加班/換班/劃休/補打卡)總數以紅色圓點顯示於「審核」選項右上，數字即時反映待處理量(>99顯示99+)，每60秒自動刷新、審核後自動更新，0筆時隱藏'},
 {ver:'3.6.0',date:'2026-07-05',note:'打卡查詢改為日期區間查詢(起~訖)：可查一段期間出勤，結果按日分組(含星期)並顯示天數/筆數摘要，起訖顛倒自動校正，預設本月1日至今'},
@@ -1504,5 +1482,151 @@ function checkNewHireNotify(){
 <button class="btn btn-outline" style="margin-top:4px" onclick="closeNewHireForm()">返回</button>
 </div>
 </div>
+
+<!-- ═══ 每日紀錄卡 v1.0.0 ═══ -->
+<script>
+/*!
+ * 員工APP — 每日紀錄狀況卡片
+ * v1.0.0 | 2026-07-26
+ *
+ * 設計原則（重要，修改前務必先讀）：
+ *   1. 只讀 salesQty（數量層），一律不碰 catalog/costs 與 recon
+ *      → 員工端就算開 DevTools 看網路請求，也拿不到任何成本或消失成本
+ *   2. 只顯示「數量」與「完成／覆核狀態」，不顯示任何金額
+ *   3. 不顯示「短少」— 短少是推估值，直接攤在員工面前易被誤讀為指控，
+ *      且成因多為登錄疏漏／找錯錢／試吃未登記，公告出來只會造成互相猜忌
+ *   4. 報廢以「正常／偏高」燈號取代百分比 — 顯示率會讓人去猜門檻、把數字做漂亮
+ *   5. 只看自己所屬門市（curEmp.store）
+ */
+(function (W) {
+  'use strict';
+  var VERSION = '1.0.0';
+
+  /* 排班/HR 門市名 → 財會門市名（與 HR 的 S2FIN 一致） */
+  var S2FIN = { '總公司': '總公司', '交大店': '交大店', '台積電店': '台積電' };
+  /* 已啟用數量錄入的門市（未啟用者卡片不顯示，避免員工看到空殼） */
+  var ENABLED = ['台積電'];
+
+  var SCRAP_WARN = 0.05;   // 報廢率 >5% 顯示「偏高」
+
+  function DB() { try { if (typeof db !== 'undefined' && db) return db; } catch (e) {} return W.db || null; }
+  function $(id) { return document.getElementById(id); }
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function dk(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); }
+
+  function qtyDoc(fin, date) {
+    return DB().collection('finance').doc(date.slice(0, 7))
+      .collection('stores').doc(fin)
+      .collection('salesQty').doc(date);
+  }
+
+  /* 由 items 統計出「員工看得到」的數字（純數量） */
+  function summarize(data) {
+    var items = (data && data.items) || [];
+    var s = { n: 0, sold: 0, scrap: 0, staff: 0, ch: {}, locked: !!(data && data.lockedAt), lockedAt: (data && data.lockedAt) || '' };
+    items.forEach(function (it) {
+      var sold = +it.sold || 0, scrap = +it.scrap || 0, staff = +it.staff || 0;
+      if (sold || scrap || staff || it.pick) s.n++;
+      s.sold += sold; s.scrap += scrap; s.staff += staff;
+      s.ch[it.ch] = true;
+    });
+    s.scrapRate = (s.sold + s.scrap) > 0 ? s.scrap / (s.sold + s.scrap) : 0;
+    return s;
+  }
+
+  function render() {
+    var host = $('app-daily-record');
+    if (!host) return;
+    var emp = W.curEmp;
+    if (!emp || !emp.store) { host.innerHTML = ''; return; }
+    var fin = S2FIN[emp.store];
+    if (!fin || ENABLED.indexOf(fin) < 0) { host.innerHTML = ''; return; }
+    if (!DB()) { host.innerHTML = ''; return; }
+
+    var today = dk(new Date());
+    host.innerHTML = '<div class="card"><div style="color:#94a3b8;font-size:13px">載入今日紀錄…</div></div>';
+
+    qtyDoc(fin, today).get().then(function (d) {
+      paint(host, emp, fin, today, d.exists ? d.data() : null);
+      loadWeek(fin);
+    }).catch(function () { host.innerHTML = ''; });
+  }
+
+  function paint(host, emp, fin, today, data) {
+    var s = summarize(data);
+    var has = !!data;
+    var badge = !has
+      ? { t: '尚未登錄', bg: '#fef3c7', c: '#92400e' }
+      : (s.locked ? { t: '已覆核', bg: '#dcfce7', c: '#166534' } : { t: '待覆核', bg: '#fef3c7', c: '#92400e' });
+
+    var h = '<div class="card">';
+    h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'
+      + '<div><div style="font-size:16px;font-weight:700;color:#0f172a">今日紀錄</div>'
+      + '<div style="font-size:12px;color:#64748b;margin-top:2px">' + esc(emp.store) + ' · '
+      + (+today.slice(5, 7)) + '月' + (+today.slice(8, 10)) + '日</div></div>'
+      + '<span style="background:' + badge.bg + ';color:' + badge.c + ';font-size:12px;font-weight:700;padding:5px 12px;border-radius:20px">' + badge.t + '</span>'
+      + '</div>';
+
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">'
+      + statBox('已登錄品項', s.n)
+      + statBox('銷售份數', s.sold)
+      + '</div>';
+
+    h += '<div style="border-top:1px solid #e2e8f0;padding-top:10px;font-size:13px">';
+    ['臨辦', '櫃位'].forEach(function (c) {
+      h += row(c, s.ch[c] ? '<span style="color:#166534;font-weight:700">已完成</span>' : '<span style="color:#94a3b8">未登錄</span>');
+    });
+    var warn = s.scrapRate > SCRAP_WARN;
+    h += row('報廢', s.scrap + ' 份 <span style="color:' + (warn ? '#b91c1c' : '#166534') + ';font-weight:700">' + (warn ? '偏高' : '正常') + '</span>');
+    h += row('員餐檢體', s.staff + ' 份');
+    h += row('店長覆核', s.locked
+      ? '<span style="color:#166534;font-weight:700">' + esc(String(s.lockedAt).slice(11, 16)) + ' 已鎖定</span>'
+      : '<span style="color:#94a3b8">尚未覆核</span>');
+    h += '</div></div>';
+
+    /* 本週狀況 */
+    h += '<div class="card" id="app-week-record">'
+      + '<div style="font-size:13px;color:#64748b;margin-bottom:10px">本週登錄狀況</div>'
+      + '<div id="app-week-bar" style="display:flex;gap:5px"></div>'
+      + '<div style="font-size:11px;color:#94a3b8;margin-top:9px">綠＝已覆核　黃＝未覆核　灰＝無資料</div></div>';
+
+    host.innerHTML = h;
+  }
+
+  function statBox(label, val) {
+    return '<div style="background:#f8fafc;border-radius:10px;padding:12px">'
+      + '<div style="font-size:12px;color:#64748b">' + label + '</div>'
+      + '<div style="font-size:24px;font-weight:700;color:#0f172a;margin-top:3px">' + val + '</div></div>';
+  }
+  function row(k, v) {
+    return '<div style="display:flex;justify-content:space-between;padding:6px 0"><span style="color:#64748b">' + k + '</span><span>' + v + '</span></div>';
+  }
+
+  /* 近 7 日狀態條（7 次讀取，量很小） */
+  function loadWeek(fin) {
+    var bar = $('app-week-bar'); if (!bar) return;
+    var days = [], now = new Date();
+    for (var i = 6; i >= 0; i--) { var d = new Date(now); d.setDate(now.getDate() - i); days.push(d); }
+    var W_ = ['日', '一', '二', '三', '四', '五', '六'];
+
+    Promise.all(days.map(function (d) {
+      return qtyDoc(fin, dk(d)).get().then(function (s) {
+        return s.exists ? (s.data().lockedAt ? 'ok' : 'wait') : 'none';
+      }).catch(function () { return 'none'; });
+    })).then(function (st) {
+      var C = { ok: '#dcfce7', wait: '#fef3c7', none: '#f1f5f9' };
+      bar.innerHTML = days.map(function (d, i) {
+        return '<div style="flex:1;text-align:center">'
+          + '<div style="height:30px;border-radius:8px;background:' + C[st[i]] + '"></div>'
+          + '<div style="font-size:11px;color:#64748b;margin-top:4px">' + W_[d.getDay()] + '</div></div>';
+      }).join('');
+    });
+  }
+
+  W.HaomingAppDailyRecord = { VERSION: VERSION, render: render, S2FIN: S2FIN, ENABLED: ENABLED };
+})(window);
+
+</script>
 </body>
 </html>
