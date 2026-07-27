@@ -621,8 +621,9 @@ function submitAppSurvey(sid){if(!db)return;var scores=[];var buttons=document.q
 function syncPunchFromFB(){if(!curEmp||!db)return;db.collection(fbEnv+'_hrdata').doc('punchRecords').get().then(function(doc){if(!doc.exists)return;var data=doc.data().data||[];var myToday=data.filter(function(r){var now=new Date();var today=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());return r.eid===curEmp.id&&r.date===today});if(myToday.length>0){var local=JSON.parse(localStorage.getItem('hm_app_punch')||'[]');myToday.forEach(function(r){if(!local.find(function(x){return x.id===r.id}))local.push(r)});localStorage.setItem('hm_app_punch',JSON.stringify(local));renderPunchToday()}}).catch(function(){})}
 
 
-var APP_VERSION='3.10.0';
+var APP_VERSION='3.10.1';
 var APP_CHANGELOG=[
+{ver:'3.10.1',date:'2026-07-27',changes:['【一致性】首頁「今日紀錄」卡片的「員餐檢體」更名為「員餐/檢體」，與財會系統數量錄入頁用語統一（財會 v4.1.2 同步調整）']},
 {ver:'3.10.0',date:'2026-07-26',changes:['【新增·首頁「今日紀錄」卡片】顯示今日已登錄品項數、銷售/報廢/員餐份數、臨辦與櫃位是否完成、店長是否已覆核，另附本週登錄狀況條（綠=已覆核/黃=未覆核/灰=無資料）。只顯示自己所屬門市，未啟用數量錄入的門市不顯示此卡','【設計原則·刻意不顯示金額】卡片一律不顯示單位成本、耗損金額、員工餐金額與短少數量。短少為推估值且成因多為登錄疏漏、找錯錢、試吃未登記，直接公告易被誤讀為指控並造成互相猜忌；報廢改以「正常/偏高」燈號取代百分比，避免員工去猜門檻把數字做漂亮','【資安·實體隔離】卡片僅讀 finance/{月}/stores/{門市}/salesQty（數量層），完全不觸及 catalog/costs 與 recon（成本與勾稽結果）。員工端即使開發者工具檢視網路請求也拿不到成本資料，非僅前端隱藏']},
 {ver:'3.9.0',date:'2026-07-26',changes:['【根本修正·打卡圍籬改由管理端同步】APP原將門市座標與圍籬半徑寫死(總公司僅100m、與管理端設定的200m不符),且完全未同步管理端設定,老闆調整圍籬永遠不生效,是員工時常無法打卡的主因。現改為自動同步管理端設定(含localStorage快取,離線也能用),缺漏欄位以內建基準補齊','【改善·GPS改為持續校正】原僅定位一次,首次定位不準就被凍結在錯誤座標;現改為持續校正並自動採用最精準的一次定位,室內定位隨時間收斂,大幅減少「明明在店裡卻說不在範圍」','【改善·GPS誤差容忍改為動態】原容忍上限固定150m,室內誤差常達200~500m導致誤擋;現改為「圍籬半徑＋實際定位誤差」動態判定,並顯示目前誤差值','【新增·無定位時仍可打卡(標記待確認)】定位被拒絕、訊號不足或裝置不支援時,確認後仍可打卡,該筆標記「無定位・待確認」並記錄定位誤差供主管核對,不再完全打不了卡','【改善·離開打卡頁自動停止定位】節省手機電量']},
 {ver:'3.8.0',date:'2026-07-05',note:'打卡查詢新增快捷範圍鈕:一鍵「本月/上月/近7天」自動帶入起訖並查詢，仍可手動選自訂區間。搭配v3.6區間查詢,整月或任意期間出勤一鍵可得'},
@@ -1579,7 +1580,7 @@ function checkNewHireNotify(){
     });
     var warn = s.scrapRate > SCRAP_WARN;
     h += row('報廢', s.scrap + ' 份 <span style="color:' + (warn ? '#b91c1c' : '#166534') + ';font-weight:700">' + (warn ? '偏高' : '正常') + '</span>');
-    h += row('員餐檢體', s.staff + ' 份');
+    h += row('員餐/檢體', s.staff + ' 份');
     h += row('店長覆核', s.locked
       ? '<span style="color:#166534;font-weight:700">' + esc(String(s.lockedAt).slice(11, 16)) + ' 已鎖定</span>'
       : '<span style="color:#94a3b8">尚未覆核</span>');
