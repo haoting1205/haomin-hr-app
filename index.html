@@ -621,8 +621,9 @@ function submitAppSurvey(sid){if(!db)return;var scores=[];var buttons=document.q
 function syncPunchFromFB(){if(!curEmp||!db)return;db.collection(fbEnv+'_hrdata').doc('punchRecords').get().then(function(doc){if(!doc.exists)return;var data=doc.data().data||[];var myToday=data.filter(function(r){var now=new Date();var today=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());return r.eid===curEmp.id&&r.date===today});if(myToday.length>0){var local=JSON.parse(localStorage.getItem('hm_app_punch')||'[]');myToday.forEach(function(r){if(!local.find(function(x){return x.id===r.id}))local.push(r)});localStorage.setItem('hm_app_punch',JSON.stringify(local));renderPunchToday()}}).catch(function(){})}
 
 
-var APP_VERSION='3.10.1';
+var APP_VERSION='3.11.0';
 var APP_CHANGELOG=[
+{ver:'3.11.0',date:'2026-07-27',changes:['【新增·本週表現（全體員工）】卡片新增相對指標：報廢較上週的增減趨勢（↓綠色代表改善）、本週登錄完成天數。刻意只顯示「比上週好或差」而非絕對比率——顯示絕對數字會讓人去猜門檻、把數字做漂亮，相對趨勢才反映真實努力','【新增·門市統計（僅店長/老闆）】依角色顯示近7日銷售份數、報廢份數與報廢率、員餐/檢體份數、短少份數與短少率（>2%標示需留意）。店長本就要為門市營運負責，故給予絕對數字','【資安·仍不顯示任何金額】無論何種角色，本卡片一律不顯示單位成本、耗損金額、員餐金額、消失成本與毛利，且完全不讀取 catalog/costs 與 recon。已加測試驗證輸出文字不含「成本/金額/毛利/消失/$/元」等字樣','【效能】週狀態條由讀取 7 日擴充為 14 日（用於與上週比較），單次開啟首頁多 7 次讀取，量極小']},
 {ver:'3.10.1',date:'2026-07-27',changes:['【一致性】首頁「今日紀錄」卡片的「員餐檢體」更名為「員餐/檢體」，與財會系統數量錄入頁用語統一（財會 v4.1.2 同步調整）']},
 {ver:'3.10.0',date:'2026-07-26',changes:['【新增·首頁「今日紀錄」卡片】顯示今日已登錄品項數、銷售/報廢/員餐份數、臨辦與櫃位是否完成、店長是否已覆核，另附本週登錄狀況條（綠=已覆核/黃=未覆核/灰=無資料）。只顯示自己所屬門市，未啟用數量錄入的門市不顯示此卡','【設計原則·刻意不顯示金額】卡片一律不顯示單位成本、耗損金額、員工餐金額與短少數量。短少為推估值且成因多為登錄疏漏、找錯錢、試吃未登記，直接公告易被誤讀為指控並造成互相猜忌；報廢改以「正常/偏高」燈號取代百分比，避免員工去猜門檻把數字做漂亮','【資安·實體隔離】卡片僅讀 finance/{月}/stores/{門市}/salesQty（數量層），完全不觸及 catalog/costs 與 recon（成本與勾稽結果）。員工端即使開發者工具檢視網路請求也拿不到成本資料，非僅前端隱藏']},
 {ver:'3.9.0',date:'2026-07-26',changes:['【根本修正·打卡圍籬改由管理端同步】APP原將門市座標與圍籬半徑寫死(總公司僅100m、與管理端設定的200m不符),且完全未同步管理端設定,老闆調整圍籬永遠不生效,是員工時常無法打卡的主因。現改為自動同步管理端設定(含localStorage快取,離線也能用),缺漏欄位以內建基準補齊','【改善·GPS改為持續校正】原僅定位一次,首次定位不準就被凍結在錯誤座標;現改為持續校正並自動採用最精準的一次定位,室內定位隨時間收斂,大幅減少「明明在店裡卻說不在範圍」','【改善·GPS誤差容忍改為動態】原容忍上限固定150m,室內誤差常達200~500m導致誤擋;現改為「圍籬半徑＋實際定位誤差」動態判定,並顯示目前誤差值','【新增·無定位時仍可打卡(標記待確認)】定位被拒絕、訊號不足或裝置不支援時,確認後仍可打卡,該筆標記「無定位・待確認」並記錄定位誤差供主管核對,不再完全打不了卡','【改善·離開打卡頁自動停止定位】節省手機電量']},
@@ -1484,8 +1485,9 @@ function checkNewHireNotify(){
 </div>
 </div>
 
-<!-- ═══ 每日紀錄卡 v1.0.0 ═══ -->
+<!-- ═══ 每日紀錄卡 v2.0.0 ═══ -->
 <script>
+
 /*!
  * 員工APP — 每日紀錄狀況卡片
  * v1.0.0 | 2026-07-26
@@ -1501,7 +1503,7 @@ function checkNewHireNotify(){
  */
 (function (W) {
   'use strict';
-  var VERSION = '1.0.0';
+  var VERSION = '2.0.0';
 
   /* 排班/HR 門市名 → 財會門市名（與 HR 的 S2FIN 一致） */
   var S2FIN = { '總公司': '總公司', '交大店': '交大店', '台積電店': '台積電' };
@@ -1511,6 +1513,14 @@ function checkNewHireNotify(){
   var SCRAP_WARN = 0.05;   // 報廢率 >5% 顯示「偏高」
 
   function DB() { try { if (typeof db !== 'undefined' && db) return db; } catch (e) {} return W.db || null; }
+  /* 店長/老闆才看得到門市統計；一般員工只看得到相對指標。
+     ⚠ 無論哪種角色，本模組一律不顯示任何金額、成本或毛利。 */
+  function isMgr() {
+    try {
+      var r = (W.curAcct && W.curAcct.role) || '';
+      return r === '老闆' || r === '店長' || r === 'boss';
+    } catch (e) { return false; }
+  }
   function $(id) { return document.getElementById(id); }
   function pad(n) { return String(n).padStart(2, '0'); }
   function dk(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
@@ -1604,29 +1614,104 @@ function checkNewHireNotify(){
     return '<div style="display:flex;justify-content:space-between;padding:6px 0"><span style="color:#64748b">' + k + '</span><span>' + v + '</span></div>';
   }
 
-  /* 近 7 日狀態條（7 次讀取，量很小） */
+  /* 近 14 日：前 7 日畫狀態條，後 7 日用來做「較上週」比較（14 次讀取，量很小） */
   function loadWeek(fin) {
     var bar = $('app-week-bar'); if (!bar) return;
-    var days = [], now = new Date();
+    var now = new Date(), days = [], prev = [];
     for (var i = 6; i >= 0; i--) { var d = new Date(now); d.setDate(now.getDate() - i); days.push(d); }
+    for (var j = 13; j >= 7; j--) { var p = new Date(now); p.setDate(now.getDate() - j); prev.push(p); }
     var W_ = ['日', '一', '二', '三', '四', '五', '六'];
 
-    Promise.all(days.map(function (d) {
-      return qtyDoc(fin, dk(d)).get().then(function (s) {
-        return s.exists ? (s.data().lockedAt ? 'ok' : 'wait') : 'none';
-      }).catch(function () { return 'none'; });
-    })).then(function (st) {
+    var fetch = function (arr) {
+      return Promise.all(arr.map(function (d) {
+        return qtyDoc(fin, dk(d)).get()
+          .then(function (s) { return s.exists ? s.data() : null; })
+          .catch(function () { return null; });
+      }));
+    };
+
+    Promise.all([fetch(days), fetch(prev)]).then(function (r) {
+      var cur = r[0], old = r[1];
       var C = { ok: '#dcfce7', wait: '#fef3c7', none: '#f1f5f9' };
       bar.innerHTML = days.map(function (d, i) {
+        var st = !cur[i] ? 'none' : (cur[i].lockedAt ? 'ok' : 'wait');
         return '<div style="flex:1;text-align:center">'
-          + '<div style="height:30px;border-radius:8px;background:' + C[st[i]] + '"></div>'
+          + '<div style="height:30px;border-radius:8px;background:' + C[st] + '"></div>'
           + '<div style="font-size:11px;color:#64748b;margin-top:4px">' + W_[d.getDay()] + '</div></div>';
       }).join('');
+      paintStats(agg(cur), agg(old), cur);
     });
+  }
+
+  /* 彙總一週的數量（純數量，不含任何金額） */
+  function agg(list) {
+    var a = { sold: 0, scrap: 0, staff: 0, short: 0, pick: 0, days: 0, locked: 0 };
+    list.forEach(function (d) {
+      if (!d) return;
+      a.days++; if (d.lockedAt) a.locked++;
+      (d.items || []).forEach(function (it) {
+        var sold = +it.sold || 0, scrap = +it.scrap || 0, staff = +it.staff || 0, pick = +it.pick || 0;
+        a.sold += sold; a.scrap += scrap; a.staff += staff; a.pick += pick;
+        if (pick) a.short += Math.max(0, pick - sold - scrap - staff);
+      });
+    });
+    a.scrapRate = (a.sold + a.scrap) > 0 ? a.scrap / (a.sold + a.scrap) : 0;
+    a.shortRate = a.pick > 0 ? a.short / a.pick : 0;
+    return a;
+  }
+
+  /* 相對指標：只講「比上週好或差」，不揭露絕對成本結構 */
+  function trend(curV, oldV) {
+    if (!oldV) return null;
+    var pct = (curV - oldV) / oldV * 100;
+    if (!isFinite(pct)) return null;
+    return Math.round(pct);
+  }
+  function trendTag(pct, goodIsDown) {
+    if (pct === null) return '<span style="color:#94a3b8">—</span>';
+    if (Math.abs(pct) < 1) return '<span style="color:#64748b">與上週持平</span>';
+    var down = pct < 0, good = goodIsDown ? down : !down;
+    return '<span style="color:' + (good ? '#166534' : '#b91c1c') + ';font-weight:700">'
+      + (down ? '↓' : '↑') + Math.abs(pct) + '%</span>'
+      + '<span style="color:#94a3b8;font-size:11px"> 較上週</span>';
+  }
+
+  function paintStats(cur, old, curList) {
+    var host = $('app-week-record'); if (!host) return;
+    var h = '';
+
+    /* ── 全體員工：相對指標（無絕對比率、無金額）── */
+    h += '<div style="border-top:1px solid #e2e8f0;margin-top:12px;padding-top:12px">'
+      + '<div style="font-size:13px;color:#64748b;margin-bottom:8px">本週表現</div>'
+      + row2('報廢', trendTag(trend(cur.scrapRate, old.scrapRate), true))
+      + row2('登錄完成', cur.days ? (cur.locked + ' / ' + cur.days + ' 天已覆核') : '<span style="color:#94a3b8">尚無紀錄</span>')
+      + '</div>';
+
+    /* ── 店長/老闆：門市統計（數量與比率，仍不含金額）── */
+    if (isMgr()) {
+      h += '<div style="border-top:1px solid #e2e8f0;margin-top:12px;padding-top:12px">'
+        + '<div style="font-size:13px;color:#0f766e;font-weight:700;margin-bottom:8px">📊 門市統計（店長）</div>'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px">'
+        + statBox('近7日銷售', cur.sold)
+        + statBox('報廢率', (cur.scrapRate * 100).toFixed(1) + '%')
+        + '</div>'
+        + row2('報廢份數', cur.scrap + ' 份')
+        + row2('員餐/檢體', cur.staff + ' 份')
+        + (cur.pick ? row2('短少份數', cur.short + ' 份（' + (cur.shortRate * 100).toFixed(1) + '%）'
+            + (cur.shortRate > 0.02 ? ' <span style="color:#b91c1c;font-weight:700">需留意</span>' : '')) : '')
+        + '<div style="font-size:11px;color:#94a3b8;margin-top:8px">僅顯示數量與比率；成本與金額請至財會系統檢視</div>'
+        + '</div>';
+    }
+    host.insertAdjacentHTML('beforeend', h);
+  }
+  function row2(k, v) {
+    return '<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:13px">'
+      + '<span style="color:#64748b">' + k + '</span><span>' + v + '</span></div>';
   }
 
   W.HaomingAppDailyRecord = { VERSION: VERSION, render: render, S2FIN: S2FIN, ENABLED: ENABLED };
 })(window);
+
 
 </script>
 </body>
