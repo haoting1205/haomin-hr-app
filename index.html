@@ -621,8 +621,9 @@ function submitAppSurvey(sid){if(!db)return;var scores=[];var buttons=document.q
 function syncPunchFromFB(){if(!curEmp||!db)return;db.collection(fbEnv+'_hrdata').doc('punchRecords').get().then(function(doc){if(!doc.exists)return;var data=doc.data().data||[];var myToday=data.filter(function(r){var now=new Date();var today=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());return r.eid===curEmp.id&&r.date===today});if(myToday.length>0){var local=JSON.parse(localStorage.getItem('hm_app_punch')||'[]');myToday.forEach(function(r){if(!local.find(function(x){return x.id===r.id}))local.push(r)});localStorage.setItem('hm_app_punch',JSON.stringify(local));renderPunchToday()}}).catch(function(){})}
 
 
-var APP_VERSION='3.11.0';
+var APP_VERSION='3.12.0';
 var APP_CHANGELOG=[
+{ver:'3.12.0',date:'2026-07-30',changes:['【新增·本週報廢分析】首頁列出近一週報廢最多的品項（份數與比率，紅色>15%、橘色>5%）。附註「報廢多半是一次做太多，不是賣不好」—— 這是現場改善的重點，不是檢討誰','【新增·建議製作數量】依近一週平均銷量算出每項該做多少，油炸品另給「首批做幾份、售完再炸」的分批建議，接單現做類（燒餅/河粉蛋餅/炒麵/虎咬豬）明確標示不需預先製作。資料不足5天時顯示提醒','【資安·仍完全不顯示金額】建議量演算法刻意只用「數量與售價」判斷，不使用單位成本 —— 員工APP 無成本讀取權限，若依賴成本兩邊會算出不同數字。已加測試驗證輸出不含「成本/金額/毛利/消失/營收/$/元」，且在無 catalog/costs 的情況下仍正常運作','【修改·分通路覆核】臨辦與櫃位改為各自顯示覆核狀態與時間，徽章新增「部分覆核」；本週狀況條新增藍色代表部分覆核。覆核進度改以 N/2 呈現','【一致性】建議量與財會系統共用同一份引擎演算法（HaomingRecon.suggestPrep），不會出現店員與老闆看到不同建議量的情況']},
 {ver:'3.11.0',date:'2026-07-27',changes:['【新增·本週表現（全體員工）】卡片新增相對指標：報廢較上週的增減趨勢（↓綠色代表改善）、本週登錄完成天數。刻意只顯示「比上週好或差」而非絕對比率——顯示絕對數字會讓人去猜門檻、把數字做漂亮，相對趨勢才反映真實努力','【新增·門市統計（僅店長/老闆）】依角色顯示近7日銷售份數、報廢份數與報廢率、員餐/檢體份數、短少份數與短少率（>2%標示需留意）。店長本就要為門市營運負責，故給予絕對數字','【資安·仍不顯示任何金額】無論何種角色，本卡片一律不顯示單位成本、耗損金額、員餐金額、消失成本與毛利，且完全不讀取 catalog/costs 與 recon。已加測試驗證輸出文字不含「成本/金額/毛利/消失/$/元」等字樣','【效能】週狀態條由讀取 7 日擴充為 14 日（用於與上週比較），單次開啟首頁多 7 次讀取，量極小']},
 {ver:'3.10.1',date:'2026-07-27',changes:['【一致性】首頁「今日紀錄」卡片的「員餐檢體」更名為「員餐/檢體」，與財會系統數量錄入頁用語統一（財會 v4.1.2 同步調整）']},
 {ver:'3.10.0',date:'2026-07-26',changes:['【新增·首頁「今日紀錄」卡片】顯示今日已登錄品項數、銷售/報廢/員餐份數、臨辦與櫃位是否完成、店長是否已覆核，另附本週登錄狀況條（綠=已覆核/黃=未覆核/灰=無資料）。只顯示自己所屬門市，未啟用數量錄入的門市不顯示此卡','【設計原則·刻意不顯示金額】卡片一律不顯示單位成本、耗損金額、員工餐金額與短少數量。短少為推估值且成因多為登錄疏漏、找錯錢、試吃未登記，直接公告易被誤讀為指控並造成互相猜忌；報廢改以「正常/偏高」燈號取代百分比，避免員工去猜門檻把數字做漂亮','【資安·實體隔離】卡片僅讀 finance/{月}/stores/{門市}/salesQty（數量層），完全不觸及 catalog/costs 與 recon（成本與勾稽結果）。員工端即使開發者工具檢視網路請求也拿不到成本資料，非僅前端隱藏']},
@@ -1485,7 +1486,331 @@ function checkNewHireNotify(){
 </div>
 </div>
 
-<!-- ═══ 每日紀錄卡 v2.0.0 ═══ -->
+<!-- ═══ 勾稽引擎 v1.4.0（提供 aggregate / suggestPrep）═══ -->
+<script>
+/*!
+ * HaomingRecon — 好洺餐飲 銷售數量勾稽引擎
+ * v1.0.0 | 2026-07-26
+ * 純函式模組，無 DOM 依賴、無副作用 → 可單元測試、可跨系統共用
+ * 用途：以紙本銷售數量推算理論營收，與財會實收勾稽，並反推消失成本
+ */
+(function (root) {
+  'use strict';
+
+  var RECON_VERSION = '1.4.0';        // 勾稽引擎版本（勿與財會系統的 VER 混淆）
+
+  /* ─────────────────────────────────────────────────────────
+   * 通路規則（config 驅動；新門市/加盟只改此處，不動邏輯）
+   *   hasPick   : 總量是否為「獨立來源」→ 唯有如此才能反推短少
+   *   pickLabel : 該通路對總量的稱呼
+   *   madeIsSum : 總量是由其他三欄相加而得（非獨立來源）
+   *   accts     : 對應財會該通路的收入科目
+   *
+   * 兩通路的差別在於「總量從哪裡來」：
+   *   臨辦：取餐數量是從中央廚房領出的獨立數字
+   *         → 取餐 = 銷售 + 員餐/檢體 + 報廢 + 短少，可反推短少
+   *   櫃位：現場製作，沒有獨立的總量來源
+   *         → 製作 = 銷售 + 員餐/檢體 + 報廢（定義式，僅供顯示）
+   *         → 因為製作是算出來的，短少恆為 0，故不計算
+   * ───────────────────────────────────────────────────────── */
+  var CHANNEL_RULES = {
+    '台積電': {
+      '臨辦': { hasPick: true,  pickLabel: '取餐', accts: ['臨辦現金', '臨辦刷餐'] },
+      '櫃位': { hasPick: false, pickLabel: '製作', madeIsSum: true,
+                accts: ['電子支付', '夜早金額', '自費早餐', '紙本補單', '夜早現金'] }
+    }
+    // '交大店': { ... }  ← 依相同格式擴充
+    // '總公司': { ... }
+  };
+
+  /* 警戒閾值（可由呼叫端覆寫） */
+  var THRESHOLD = {
+    scrapRate: 0.05,   // 報廢率 >5% 示警
+    diffRate: 0.02,    // 帳務差距 >2% 示警
+    shortRate: 0.02    // 短少率 >2% 示警
+  };
+
+  /* ─────────────────────────────────────────────────────────
+   * 建議備量規則（config 驅動）
+   * ⚠ 刻意只用「數量」與「售價」判斷，不使用單位成本 ——
+   *   員工APP 沒有成本讀取權限，若演算法依賴成本，兩邊會算出不同的建議量。
+   *   以售價 ≥55 元作為「高單價品」代理指標（對應成本約 ≥25 元）。
+   * ───────────────────────────────────────────────────────── */
+  var PREP = {
+    madeToOrder: ['燒餅', '河粉蛋餅', '炒麵', '虎咬豬'],   // 接單現做，不預備
+    friedCat: '點心',
+    friedNames: ['雞塊', '薯餅', '薯條', '小熱狗', '椒鹽雞排'],
+    drinkNames: ['紅茶', '奶茶', '豆漿', '豆漿紅茶', '豆米漿', '米漿'],
+    hiPrice: 55,        // 高單價門檻（寧缺不廢）
+    scrapWarn: 0.05,    // 報廢率警戒
+    scrapBad: 0.15      // 報廢率嚴重
+  };
+
+  var n = function (v) { return (typeof v === 'number' && isFinite(v)) ? v : 0; };
+  var r2 = function (v) { return Math.round(v * 100) / 100; };
+
+  /* ─────────────────────────────────────────────────────────
+   * validate — 守恆防呆（錄入頁即時檢核用）
+   * 回傳 { ok, errors:[{idx,sku,msg}] }
+   * ───────────────────────────────────────────────────────── */
+  function validate(items, store) {
+    var rules = CHANNEL_RULES[store] || {};
+    var errors = [];
+    (items || []).forEach(function (it, i) {
+      var rule = rules[it.ch];
+      if (!rule) { errors.push({ idx: i, sku: it.sku, msg: '未定義的通路：' + it.ch }); return; }
+      var sold = n(it.sold), scrap = n(it.scrap), staff = n(it.staff), pick = n(it.pick);
+      if (sold < 0 || scrap < 0 || staff < 0 || pick < 0) {
+        errors.push({ idx: i, sku: it.sku, msg: '數量不可為負' });
+      }
+      if (rule.hasPick && (sold + scrap + staff) > pick) {
+        errors.push({
+          idx: i, sku: it.sku,
+          msg: '流向不守恆：銷售+員餐/檢體+報廢(' + (sold + scrap + staff) + ') > ' + (rule.pickLabel || '總量') + '(' + pick + ')'
+        });
+      }
+    });
+    return { ok: errors.length === 0, errors: errors };
+  }
+
+  /* ─────────────────────────────────────────────────────────
+   * calc — 勾稽主引擎
+   * @param {Object} p
+   *   p.store    門市名（對應 CHANNEL_RULES）
+   *   p.date     YYYY-MM-DD
+   *   p.items    [{sku,ch,pick,sold,scrap,staff}]
+   *   p.products {sku:{name,cat,price}}
+   *   p.costs    {sku:{cost,costRev}}
+   *   p.income   {科目名:金額}  ← 財會當日各收入科目實收
+   *   p.threshold 可選，覆寫警戒值
+   * ───────────────────────────────────────────────────────── */
+  function calc(p) {
+    p = p || {};
+    var store = p.store, rules = CHANNEL_RULES[store];
+    if (!rules) throw new Error('HaomingRecon: 未定義門市通路規則 → ' + store);
+
+    var items = p.items || [], products = p.products || {},
+        costs = p.costs || {}, income = p.income || {},
+        TH = Object.assign({}, THRESHOLD, p.threshold || {});
+
+    var ch = {}, byItem = [], missingCost = [], costRevUsed = 0;
+
+    Object.keys(rules).forEach(function (name) {
+      ch[name] = {
+        theo: 0, actual: 0, diff: 0, diffRate: 0,
+        cogs: 0, gross: 0, grossRate: 0,
+        soldQty: 0, scrapQty: 0, scrapAmt: 0, staffQty: 0, staffAmt: 0,
+        shortQty: 0, shortAmt: 0, pickQty: 0,
+        hasPick: rules[name].hasPick, accts: rules[name].accts.slice()
+      };
+    });
+
+    /* 逐品項計算 */
+    items.forEach(function (it) {
+      var rule = rules[it.ch]; if (!rule) return;
+      var acc = ch[it.ch];
+      var prod = products[it.sku] || {};
+      var price = n(prod.price);
+      var cRec = costs[it.sku];
+      var cost = cRec ? n(cRec.cost) : null;
+      if (cRec && n(cRec.costRev) > costRevUsed) costRevUsed = n(cRec.costRev);
+      if (cost === null) missingCost.push(it.sku);
+
+      var sold = n(it.sold), scrap = n(it.scrap), staff = n(it.staff), pick = n(it.pick);
+      var short = rule.hasPick ? Math.max(0, pick - sold - scrap - staff) : 0;
+
+      var theo = sold * price;
+      /* 銷貨成本只計「賣出去」的部分；報廢/員餐/短少的成本另外歸類，
+         否則會與耗損金額重複計算，把損失灌水一倍。 */
+      var cogs = sold * n(cost);
+      var scrapAmt = scrap * n(cost);
+      var staffAmt = staff * n(cost);
+      var shortAmt = short * n(cost);
+
+      acc.theo += theo; acc.cogs += cogs; acc.soldQty += sold; acc.pickQty += pick;
+      acc.scrapQty += scrap; acc.scrapAmt += scrapAmt;
+      acc.staffQty += staff; acc.staffAmt += staffAmt;
+      acc.shortQty += short; acc.shortAmt += shortAmt;
+
+      byItem.push({
+        sku: it.sku, ch: it.ch, name: prod.name || it.sku, cat: prod.cat || '',
+        price: price, cost: cost, sold: sold, pick: pick,
+        scrap: scrap, staff: staff, short: short,
+        theo: r2(theo), cogs: r2(cogs), gross: r2(theo - cogs),
+        grossRate: theo > 0 ? r2((theo - cogs) / theo * 1000) / 1000 : 0,
+        scrapAmt: r2(scrapAmt), staffAmt: r2(staffAmt), shortAmt: r2(shortAmt),
+        scrapRate: (sold + scrap) > 0 ? r2(scrap / (sold + scrap) * 1000) / 1000 : 0
+      });
+    });
+
+    /* 通路彙總 + 對財會實收 */
+    var flags = [], hiddenLoss = 0, totTheo = 0, totActual = 0;
+    Object.keys(ch).forEach(function (name) {
+      var a = ch[name];
+      a.actual = a.accts.reduce(function (s, k) { return s + n(income[k]); }, 0);
+      a.diff = a.actual - a.theo;
+      a.diffRate = a.theo > 0 ? a.diff / a.theo : 0;
+
+      a.gross = a.theo - a.cogs;
+      a.grossRate = a.theo > 0 ? a.gross / a.theo : 0;
+      ['theo', 'actual', 'diff', 'cogs', 'gross', 'scrapAmt', 'staffAmt', 'shortAmt'].forEach(function (k) { a[k] = r2(a[k]); });
+      a.grossRate = r2(a.grossRate * 1000) / 1000;
+      a.diffRate = r2(a.diffRate * 1000) / 1000;
+
+      hiddenLoss += a.scrapAmt + a.staffAmt + a.shortAmt;
+      totTheo += a.theo; totActual += a.actual;
+
+      if (Math.abs(a.diffRate) > TH.diffRate) {
+        flags.push({ lv: 'warn', ch: name, code: 'DIFF', msg: name + ' 帳務差距 ' + (a.diffRate * 100).toFixed(1) + '%（' + a.diff + ' 元）' });
+      }
+      var sr = (a.soldQty + a.scrapQty) > 0 ? a.scrapQty / (a.soldQty + a.scrapQty) : 0;
+      if (sr > TH.scrapRate) {
+        flags.push({ lv: 'warn', ch: name, code: 'SCRAP', msg: name + ' 報廢率 ' + (sr * 100).toFixed(1) + '%' });
+      }
+      if (a.hasPick && a.pickQty > 0) {
+        var shr = a.shortQty / a.pickQty;
+        if (shr > TH.shortRate) {
+          flags.push({ lv: 'alert', ch: name, code: 'SHORT', msg: name + ' 短少率 ' + (shr * 100).toFixed(1) + '%，消失成本 ' + a.shortAmt + ' 元' });
+        }
+      }
+    });
+
+    if (missingCost.length) {
+      flags.push({ lv: 'alert', code: 'NOCOST', msg: '缺單位成本 ' + missingCost.length + ' 項，耗損/消失成本低估：' + missingCost.slice(0, 5).join(',') });
+    }
+
+    /* 排行：指出該查哪個品項 */
+    var topScrap = byItem.filter(function (x) { return x.scrapAmt > 0; })
+                         .sort(function (a, b) { return b.scrapAmt - a.scrapAmt; }).slice(0, 5);
+    var topShort = byItem.filter(function (x) { return x.shortAmt > 0; })
+                         .sort(function (a, b) { return b.shortAmt - a.shortAmt; }).slice(0, 5);
+
+    return {
+      engine: RECON_VERSION,
+      store: store, date: p.date || null,
+      costRevUsed: costRevUsed,
+      ch: ch,
+      total: {
+        theo: r2(totTheo), actual: r2(totActual), diff: r2(totActual - totTheo),
+        cogs: r2(Object.keys(ch).reduce(function (s, k) { return s + ch[k].cogs; }, 0)),
+        gross: r2(Object.keys(ch).reduce(function (s, k) { return s + ch[k].gross; }, 0)),
+        grossRate: totTheo > 0 ? r2(Object.keys(ch).reduce(function (s, k) { return s + ch[k].gross; }, 0) / totTheo * 1000) / 1000 : 0,
+        soldQty: Object.keys(ch).reduce(function (s, k) { return s + ch[k].soldQty; }, 0),
+        scrapAmt: r2(Object.keys(ch).reduce(function (s, k) { return s + ch[k].scrapAmt; }, 0)),
+        staffAmt: r2(Object.keys(ch).reduce(function (s, k) { return s + ch[k].staffAmt; }, 0)),
+        shortAmt: r2(Object.keys(ch).reduce(function (s, k) { return s + ch[k].shortAmt; }, 0)),
+        hiddenLoss: r2(hiddenLoss)
+      },
+      topScrap: topScrap, topShort: topShort,
+      byItem: byItem, flags: flags, missingCost: missingCost,
+      calcAt: new Date().toISOString()
+    };
+  }
+
+  /* ─────────────────────────────────────────────────────────
+   * aggregate — 跨日期間彙總（純數量層，不需成本）
+   * @param days  [{date, items:[...]}...]  多日的 salesQty
+   * @param products {sku:{name,cat,price}}
+   * 回傳 { byItem:[...], byCat:[...], total:{...}, days:N }
+   * ───────────────────────────────────────────────────────── */
+  function aggregate(days, products, store) {
+    products = products || {};
+    var rules = CHANNEL_RULES[store] || {};
+    var m = {}, dayCount = 0, dateSet = {};
+    (days || []).forEach(function (d) {
+      if (!d || !d.items || !d.items.length) return;
+      dayCount++; dateSet[d.date] = true;
+      d.items.forEach(function (it) {
+        var k = it.sku + '|' + it.ch;
+        if (!m[k]) m[k] = { sku: it.sku, ch: it.ch, days: 0, pick: 0, sold: 0, staff: 0, scrap: 0 };
+        var r = m[k], rule = rules[it.ch] || {};
+        r.days++;
+        r.sold += n(it.sold); r.staff += n(it.staff); r.scrap += n(it.scrap);
+        r.pick += rule.hasPick ? n(it.pick) : (n(it.sold) + n(it.staff) + n(it.scrap));
+      });
+    });
+    var byItem = Object.keys(m).map(function (k) {
+      var r = m[k], p = products[r.sku] || {}, rule = rules[r.ch] || {};
+      var short = rule.hasPick ? Math.max(0, r.pick - r.sold - r.staff - r.scrap) : 0;
+      var sr = (r.sold + r.scrap) > 0 ? r.scrap / (r.sold + r.scrap) : 0;
+      var o = {
+        sku: r.sku, ch: r.ch, name: p.name || r.sku, cat: p.cat || '', price: n(p.price),
+        days: r.days, sold: r.sold, staff: r.staff, scrap: r.scrap, made: r.pick, short: short,
+        avgSold: r2(r.sold / r.days), avgMade: r2(r.pick / r.days), avgStaff: r2(r.staff / r.days),
+        scrapRate: r2(sr * 1000) / 1000,
+        shortRate: r.pick > 0 ? r2(short / r.pick * 1000) / 1000 : 0
+      };
+      o.prep = suggestPrep(o);
+      return o;
+    });
+    var byCat = {};
+    byItem.forEach(function (x) {
+      var c = x.cat || '其他';
+      if (!byCat[c]) byCat[c] = { cat: c, sold: 0, scrap: 0, staff: 0, short: 0 };
+      byCat[c].sold += x.sold; byCat[c].scrap += x.scrap;
+      byCat[c].staff += x.staff; byCat[c].short += x.short;
+    });
+    var cats = Object.keys(byCat).map(function (c) {
+      var b = byCat[c];
+      b.scrapRate = (b.sold + b.scrap) > 0 ? r2(b.scrap / (b.sold + b.scrap) * 1000) / 1000 : 0;
+      return b;
+    });
+    var T = { sold: 0, scrap: 0, staff: 0, short: 0, made: 0 };
+    byItem.forEach(function (x) { T.sold += x.sold; T.scrap += x.scrap; T.staff += x.staff; T.short += x.short; T.made += x.made; });
+    T.scrapRate = (T.sold + T.scrap) > 0 ? r2(T.scrap / (T.sold + T.scrap) * 1000) / 1000 : 0;
+    T.shortRate = T.made > 0 ? r2(T.short / T.made * 1000) / 1000 : 0;
+    return { byItem: byItem, byCat: cats, total: T, days: dayCount, dates: Object.keys(dateSet).sort() };
+  }
+
+  /* ─────────────────────────────────────────────────────────
+   * suggestPrep — 建議備量（純數量，可安全給員工看）
+   * 基準＝日均銷量；緩衝依現況調整；員餐/檢體另計（實際需求非浪費）
+   * ───────────────────────────────────────────────────────── */
+  function suggestPrep(x) {
+    if (PREP.madeToOrder.indexOf(x.cat) >= 0) {
+      return { qty: null, batch: null, note: '接單現做，不預先製作', lv: 'ok' };
+    }
+    var sr = x.scrapRate, buf;
+    if (sr > PREP.scrapWarn) buf = 1.00;                     // 已超標：壓到剛好
+    else if (sr === 0 && x.made <= x.sold + x.staff) buf = 1.15;  // 全數售完，可能有缺貨損失
+    else if (sr === 0) buf = 1.10;
+    else buf = 1.05;
+    if (x.price >= PREP.hiPrice) buf = Math.min(buf, 1.00);  // 高單價寧缺不廢
+    var qty = Math.max(1, Math.ceil(x.avgSold * buf + x.avgStaff));
+    var o = { qty: qty, batch: null, lv: 'ok', note: '' };
+    if (x.cat === PREP.friedCat && PREP.friedNames.indexOf(x.name) >= 0) {
+      o.batch = Math.max(1, Math.ceil(qty * 0.6));
+      o.note = '油炸品：首批 ' + o.batch + ' 份，售完再炸';
+    } else if (PREP.drinkNames.indexOf(x.name) >= 0) {
+      o.note = '飲品：以杯計，勿一次煮滿鍋';
+    } else if (sr > PREP.scrapBad) {
+      o.note = '★報廢率過高，務必先照此量製作';
+    } else if (sr > PREP.scrapWarn) {
+      o.note = '報廢率偏高，勿再多備';
+    } else if (sr === 0) {
+      o.note = '未曾報廢，可小幅增量試需求';
+    }
+    if (sr > PREP.scrapBad) o.lv = 'bad';
+    else if (sr > PREP.scrapWarn) o.lv = 'warn';
+    return o;
+  }
+
+  root.HaomingRecon = {
+    VERSION: RECON_VERSION,
+    CHANNEL_RULES: CHANNEL_RULES,
+    THRESHOLD: THRESHOLD,
+    PREP: PREP,
+    validate: validate,
+    calc: calc,
+    aggregate: aggregate,
+    suggestPrep: suggestPrep
+  };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+if (typeof module !== 'undefined' && module.exports) module.exports = globalThis.HaomingRecon;
+
+</script>
+<!-- ═══ 每日紀錄卡 v3.1.0 ═══ -->
 <script>
 
 /*!
@@ -1503,7 +1828,7 @@ function checkNewHireNotify(){
  */
 (function (W) {
   'use strict';
-  var VERSION = '2.0.0';
+  var VERSION = '3.1.0';
 
   /* 排班/HR 門市名 → 財會門市名（與 HR 的 S2FIN 一致） */
   var S2FIN = { '總公司': '總公司', '交大店': '交大店', '台積電店': '台積電' };
@@ -1535,7 +1860,15 @@ function checkNewHireNotify(){
   /* 由 items 統計出「員工看得到」的數字（純數量） */
   function summarize(data) {
     var items = (data && data.items) || [];
-    var s = { n: 0, sold: 0, scrap: 0, staff: 0, ch: {}, locked: !!(data && data.lockedAt), lockedAt: (data && data.lockedAt) || '' };
+    /* 分通路覆核：財會 v4.7.0 起改為每個通路各自鎖定（locks:{臨辦,櫃位}）。
+       舊資料只有 doc 層 lockedAt，視為兩通路皆已覆核。 */
+    var lk = (data && data.locks && typeof data.locks === 'object') ? data.locks : null;
+    var legacy = (data && data.lockedAt) || '';
+    var s = { n: 0, sold: 0, scrap: 0, staff: 0, ch: {}, locks: {},
+              locked: !!legacy, lockedAt: legacy };
+    ['臨辦', '櫃位'].forEach(function (c) {
+      s.locks[c] = lk ? (lk[c] || '') : legacy;
+    });
     items.forEach(function (it) {
       var sold = +it.sold || 0, scrap = +it.scrap || 0, staff = +it.staff || 0;
       if (sold || scrap || staff || it.pick) s.n++;
@@ -1558,6 +1891,15 @@ function checkNewHireNotify(){
     var today = dk(new Date());
     host.innerHTML = '<div class="card"><div style="color:#94a3b8;font-size:13px">載入今日紀錄…</div></div>';
 
+    /* 載入品項主檔（僅售價層 catalog/products，不含成本）供建議量計算 */
+    if (!W.__prepProducts) {
+      DB().collection('catalog').doc('products').get().then(function (d) {
+        var mp = {};
+        ((d.exists && d.data().items) || []).forEach(function (p) { mp[p.sku] = p; });
+        W.__prepProducts = mp;
+      }).catch(function () { W.__prepProducts = {}; });
+    }
+
     qtyDoc(fin, today).get().then(function (d) {
       paint(host, emp, fin, today, d.exists ? d.data() : null);
       loadWeek(fin);
@@ -1567,9 +1909,14 @@ function checkNewHireNotify(){
   function paint(host, emp, fin, today, data) {
     var s = summarize(data);
     var has = !!data;
+    /* 徽章：兩通路皆覆核＝已覆核；部分覆核＝部分覆核 */
+    var lkN = ['臨辦', '櫃位'].filter(function (c) { return !!s.locks[c]; }).length;
+    var chN = ['臨辦', '櫃位'].filter(function (c) { return s.ch[c]; }).length;
     var badge = !has
       ? { t: '尚未登錄', bg: '#fef3c7', c: '#92400e' }
-      : (s.locked ? { t: '已覆核', bg: '#dcfce7', c: '#166534' } : { t: '待覆核', bg: '#fef3c7', c: '#92400e' });
+      : (lkN >= 2 ? { t: '已覆核', bg: '#dcfce7', c: '#166534' }
+        : (lkN === 1 ? { t: '部分覆核', bg: '#dbeafe', c: '#1e40af' }
+                     : { t: '待覆核', bg: '#fef3c7', c: '#92400e' }));
 
     var h = '<div class="card">';
     h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'
@@ -1586,21 +1933,24 @@ function checkNewHireNotify(){
 
     h += '<div style="border-top:1px solid #e2e8f0;padding-top:10px;font-size:13px">';
     ['臨辦', '櫃位'].forEach(function (c) {
-      h += row(c, s.ch[c] ? '<span style="color:#166534;font-weight:700">已完成</span>' : '<span style="color:#94a3b8">未登錄</span>');
+      var done = !!s.ch[c], lk = !!s.locks[c];
+      h += row(c, lk ? '<span style="color:#166534;font-weight:700">🔒 已覆核 ' + esc(String(s.locks[c]).slice(11, 16)) + '</span>'
+                     : (done ? '<span style="color:#b45309;font-weight:700">已登錄・待覆核</span>'
+                             : '<span style="color:#94a3b8">未登錄</span>'));
     });
     var warn = s.scrapRate > SCRAP_WARN;
     h += row('報廢', s.scrap + ' 份 <span style="color:' + (warn ? '#b91c1c' : '#166534') + ';font-weight:700">' + (warn ? '偏高' : '正常') + '</span>');
     h += row('員餐/檢體', s.staff + ' 份');
-    h += row('店長覆核', s.locked
-      ? '<span style="color:#166534;font-weight:700">' + esc(String(s.lockedAt).slice(11, 16)) + ' 已鎖定</span>'
-      : '<span style="color:#94a3b8">尚未覆核</span>');
+    h += row('覆核進度', lkN >= 2 ? '<span style="color:#166534;font-weight:700">兩通路皆已覆核</span>'
+      : (lkN === 1 ? '<span style="color:#1e40af;font-weight:700">' + lkN + ' / 2 通路已覆核</span>'
+                   : '<span style="color:#94a3b8">尚未覆核</span>'));
     h += '</div></div>';
 
     /* 本週狀況 */
     h += '<div class="card" id="app-week-record">'
       + '<div style="font-size:13px;color:#64748b;margin-bottom:10px">本週登錄狀況</div>'
       + '<div id="app-week-bar" style="display:flex;gap:5px"></div>'
-      + '<div style="font-size:11px;color:#94a3b8;margin-top:9px">綠＝已覆核　黃＝未覆核　灰＝無資料</div></div>';
+      + '<div style="font-size:11px;color:#94a3b8;margin-top:9px">綠＝兩通路皆覆核　藍＝部分覆核　黃＝未覆核　灰＝無資料</div></div>';
 
     host.innerHTML = h;
   }
@@ -1632,14 +1982,20 @@ function checkNewHireNotify(){
 
     Promise.all([fetch(days), fetch(prev)]).then(function (r) {
       var cur = r[0], old = r[1];
-      var C = { ok: '#dcfce7', wait: '#fef3c7', none: '#f1f5f9' };
+      var C = { ok: '#dcfce7', part: '#dbeafe', wait: '#fef3c7', none: '#f1f5f9' };
       bar.innerHTML = days.map(function (d, i) {
-        var st = !cur[i] ? 'none' : (cur[i].lockedAt ? 'ok' : 'wait');
+        var v = cur[i], st = 'none';
+        if (v) {
+          var lo = (v.locks && typeof v.locks === 'object') ? v.locks : (v.lockedAt ? { '臨辦': v.lockedAt, '櫃位': v.lockedAt } : {});
+          var n2 = ['臨辦', '櫃位'].filter(function (c) { return !!lo[c]; }).length;
+          st = n2 >= 2 ? 'ok' : (n2 === 1 ? 'part' : 'wait');
+        }
         return '<div style="flex:1;text-align:center">'
           + '<div style="height:30px;border-radius:8px;background:' + C[st] + '"></div>'
           + '<div style="font-size:11px;color:#64748b;margin-top:4px">' + W_[d.getDay()] + '</div></div>';
       }).join('');
       paintStats(agg(cur), agg(old), cur);
+      paintPrep(fin, cur);
     });
   }
 
@@ -1648,7 +2004,9 @@ function checkNewHireNotify(){
     var a = { sold: 0, scrap: 0, staff: 0, short: 0, pick: 0, days: 0, locked: 0 };
     list.forEach(function (d) {
       if (!d) return;
-      a.days++; if (d.lockedAt) a.locked++;
+      a.days++;
+      var lo = (d.locks && typeof d.locks === 'object') ? d.locks : (d.lockedAt ? { '臨辦': d.lockedAt, '櫃位': d.lockedAt } : {});
+      if (['臨辦', '櫃位'].filter(function (c) { return !!lo[c]; }).length >= 2) a.locked++;
       (d.items || []).forEach(function (it) {
         var sold = +it.sold || 0, scrap = +it.scrap || 0, staff = +it.staff || 0, pick = +it.pick || 0;
         a.sold += sold; a.scrap += scrap; a.staff += staff; a.pick += pick;
@@ -1709,10 +2067,83 @@ function checkNewHireNotify(){
       + '<span style="color:#64748b">' + k + '</span><span>' + v + '</span></div>';
   }
 
+  /* ═══ 報廢分析 + 建議製作數量（全體員工可見）═══
+   * 建議量由 HaomingRecon.suggestPrep 計算 —— 與財會系統同一份演算法。
+   * ⚠ 一律不顯示金額：引擎的 aggregate/suggestPrep 只吃數量與售價，不需成本。
+   *   售價本來就印在菜單上，員工看得到不構成資訊落差。 */
+  function paintPrep(fin, curList) {
+    var host = $('app-daily-record');
+    if (!host || typeof W.HaomingRecon === 'undefined' || !W.HaomingRecon.aggregate) return;
+    if (!W.__prepProducts) return;
+
+    var days = [];
+    curList.forEach(function (v, i) { if (v) days.push({ date: 'd' + i, items: v.items || [] }); });
+    if (!days.length) return;
+
+    var A = W.HaomingRecon.aggregate(days, W.__prepProducts, fin);
+    var h = '';
+
+    /* ── 報廢分析：只給份數與比率，不給金額 ── */
+    var top = A.byItem.filter(function (x) { return x.scrap > 0; })
+                .sort(function (a, b) { return b.scrap - a.scrap; }).slice(0, 6);
+    h += '<div class="card"><div style="font-size:16px;font-weight:700;color:#0f172a;margin-bottom:4px">🗑 本週報廢分析</div>'
+      + '<div style="font-size:12px;color:#64748b;margin-bottom:10px">近 ' + A.days + ' 天 · ' + esc(fin) + '</div>';
+    if (!top.length) {
+      h += '<div style="padding:14px;text-align:center;color:#166534;font-weight:700">本週沒有報廢 👍</div>';
+    } else {
+      h += '<table style="width:100%;font-size:13px;border-collapse:collapse">'
+        + '<tr style="color:#64748b;font-size:12px"><th style="text-align:left;padding:4px 0">品項</th>'
+        + '<th style="text-align:right;padding:4px 0">報廢</th><th style="text-align:right;padding:4px 0">比率</th></tr>';
+      top.forEach(function (x) {
+        var bad = x.scrapRate > 0.15, warn = x.scrapRate > 0.05;
+        h += '<tr style="border-top:1px solid #f1f5f9"><td style="padding:7px 0">' + esc(x.name)
+          + '<span style="color:#94a3b8;font-size:11px"> ' + esc(x.cat) + '·' + esc(x.ch) + '</span></td>'
+          + '<td style="text-align:right;padding:7px 0;font-weight:700">' + x.scrap + ' 份</td>'
+          + '<td style="text-align:right;padding:7px 0;font-weight:800;color:' + (bad ? '#b91c1c' : (warn ? '#b45309' : '#166534')) + '">'
+          + (x.scrapRate * 100).toFixed(0) + '%</td></tr>';
+      });
+      h += '</table><div style="font-size:11px;color:#94a3b8;margin-top:8px">紅色 >15%、橘色 >5%。報廢多半是「一次做太多」，不是賣不好。</div>';
+    }
+    h += '</div>';
+
+    /* ── 建議製作數量 ── */
+    var list = A.byItem.filter(function (x) { return x.prep && x.prep.qty != null; })
+                 .sort(function (a, b) { return b.scrapRate - a.scrapRate || b.prep.qty - a.prep.qty; });
+    var mto = A.byItem.filter(function (x) { return x.prep && x.prep.qty == null; });
+    h += '<div class="card"><div style="font-size:16px;font-weight:700;color:#0f172a;margin-bottom:4px">📋 建議製作數量</div>'
+      + '<div style="font-size:12px;color:#64748b;margin-bottom:10px">依近 ' + A.days + ' 天平均銷量推算</div>';
+    if (A.days < 5) {
+      h += '<div style="background:#fef9c3;border-left:3px solid #ca8a04;padding:8px 10px;border-radius:6px;font-size:12px;color:#854d0e;margin-bottom:10px">'
+        + '⚠ 目前只有 ' + A.days + ' 天資料，數字僅供參考，會隨紀錄累積越來越準。</div>';
+    }
+    h += '<table style="width:100%;font-size:13px;border-collapse:collapse">'
+      + '<tr style="color:#64748b;font-size:12px"><th style="text-align:left;padding:4px 0">品項</th>'
+      + '<th style="text-align:right;padding:4px 0">日均賣出</th><th style="text-align:right;padding:4px 0">建議做</th></tr>';
+    list.slice(0, 20).forEach(function (x) {
+      var bg = x.prep.lv === 'bad' ? '#fef2f2' : (x.prep.lv === 'warn' ? '#fffbeb' : '');
+      h += '<tr style="border-top:1px solid #f1f5f9;background:' + bg + '">'
+        + '<td style="padding:7px 0">' + esc(x.name)
+        + '<span style="color:#94a3b8;font-size:11px"> ' + esc(x.cat) + '·' + esc(x.ch) + '</span>'
+        + (x.prep.note ? '<div style="font-size:11px;color:#64748b">' + esc(x.prep.note) + '</div>' : '')
+        + '</td>'
+        + '<td style="text-align:right;padding:7px 0;color:#64748b">' + x.avgSold + '</td>'
+        + '<td style="text-align:right;padding:7px 0"><b style="font-size:17px;color:#14532d;background:#dcfce7;padding:2px 9px;border-radius:6px">' + x.prep.qty + '</b></td></tr>';
+    });
+    h += '</table>';
+    if (mto.length) {
+      h += '<div style="margin-top:10px;padding:9px 11px;background:#f0fdfa;border-radius:7px;font-size:12px;color:#0f766e">'
+        + '<b>接單現做（不預先製作）</b><br>'
+        + mto.map(function (x) { return esc(x.name) + '（' + esc(x.cat) + '）'; }).join('、') + '</div>';
+    }
+    h += '</div>';
+    host.insertAdjacentHTML('beforeend', h);
+  }
+
   W.HaomingAppDailyRecord = { VERSION: VERSION, render: render, S2FIN: S2FIN, ENABLED: ENABLED };
 })(window);
 
 
 </script>
+
 </body>
 </html>
