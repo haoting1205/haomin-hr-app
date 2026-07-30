@@ -465,7 +465,7 @@ function _showVerBanner(v){if(document.getElementById('sysver-banner'))return;va
 setTimeout(checkAppVer,9000);setInterval(checkAppVer,1800000);
 
 var _DEFAULT_FB={apiKey:'AIzaSyAk8D1oXTYaq9E1t96bPW-1rMu0EhW1JzQ',projectId:'haomin-system',authDomain:'haomin-system.firebaseapp.com',storageBucket:'haomin-system.firebasestorage.app',appId:'1:348193196599:web:a454b20e4145041e39cdb2'};
-var db=null,curEmp=null,curAcct=null,staff=[],sched={},leaveRecords=[],payHistory={},appSupportPay={},punchRecords=[],storeHours={'總公司':{lat:24.81472,lng:121.02525,radius:200},'交大店':{lat:24.78374,lng:120.99706,radius:200},'台積電店':{lat:24.76619,lng:121.00812,radius:1000}},STORE_GEO={'總公司':{lat:24.81472,lng:121.02525,radius:200},'交大店':{lat:24.78374,lng:120.99706,radius:200},'台積電店':{lat:24.76619,lng:121.00812,radius:1000}},fbEnv='prod';
+var db=null,curEmp=null,curAcct=null,staff=[],sched={},leaveRecords=[],payHistory={},appSupportPay={},punchRecords=[],storeHours={'總公司':{lat:24.81472,lng:121.02525,radius:200},'交大店':{lat:24.78374,lng:120.99706,radius:200},'台積電店':{lat:24.76619,lng:121.00812,radius:10000}},STORE_GEO={'總公司':{lat:24.81472,lng:121.02525,radius:200},'交大店':{lat:24.78374,lng:120.99706,radius:200},'台積電店':{lat:24.76619,lng:121.00812,radius:10000}},fbEnv='prod';
 var viewY=new Date().getFullYear()-1911,viewM=new Date().getMonth()+1;
 function pad(n){return String(n).padStart(2,'0')}
 function fNT(v){return'NT$'+Math.round(v).toLocaleString()}
