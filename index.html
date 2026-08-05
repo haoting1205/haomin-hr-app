@@ -632,7 +632,7 @@ function submitAppSurvey(sid){if(!db)return;var scores=[];var buttons=document.q
 function syncPunchFromFB(){if(!curEmp||!db)return;db.collection(fbEnv+'_hrdata').doc('punchRecords').get().then(function(doc){if(!doc.exists)return;var data=doc.data().data||[];var myToday=data.filter(function(r){var now=new Date();var today=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());return r.eid===curEmp.id&&r.date===today});if(myToday.length>0){var local=JSON.parse(localStorage.getItem('hm_app_punch')||'[]');myToday.forEach(function(r){if(!local.find(function(x){return x.id===r.id}))local.push(r)});localStorage.setItem('hm_app_punch',JSON.stringify(local));renderPunchToday()}}).catch(function(){})}
 
 
-var APP_VERSION='3.13.0';
+var APP_VERSION='3.14.0';
 var APP_CHANGELOG=[
 {ver:'3.12.0',date:'2026-07-30',changes:['【新增·本週報廢分析】首頁列出近一週報廢最多的品項（份數與比率，紅色>15%、橘色>5%）。附註「報廢多半是一次做太多，不是賣不好」—— 這是現場改善的重點，不是檢討誰','【新增·建議製作數量】依近一週平均銷量算出每項該做多少，油炸品另給「首批做幾份、售完再炸」的分批建議，接單現做類（燒餅/河粉蛋餅/炒麵/虎咬豬）明確標示不需預先製作。資料不足5天時顯示提醒','【資安·仍完全不顯示金額】建議量演算法刻意只用「數量與售價」判斷，不使用單位成本 —— 員工APP 無成本讀取權限，若依賴成本兩邊會算出不同數字。已加測試驗證輸出不含「成本/金額/毛利/消失/營收/$/元」，且在無 catalog/costs 的情況下仍正常運作','【修改·分通路覆核】臨辦與櫃位改為各自顯示覆核狀態與時間，徽章新增「部分覆核」；本週狀況條新增藍色代表部分覆核。覆核進度改以 N/2 呈現','【一致性】建議量與財會系統共用同一份引擎演算法（HaomingRecon.suggestPrep），不會出現店員與老闆看到不同建議量的情況']},
 {ver:'3.11.0',date:'2026-07-27',changes:['【新增·本週表現（全體員工）】卡片新增相對指標：報廢較上週的增減趨勢（↓綠色代表改善）、本週登錄完成天數。刻意只顯示「比上週好或差」而非絕對比率——顯示絕對數字會讓人去猜門檻、把數字做漂亮，相對趨勢才反映真實努力','【新增·門市統計（僅店長/老闆）】依角色顯示近7日銷售份數、報廢份數與報廢率、員餐/檢體份數、短少份數與短少率（>2%標示需留意）。店長本就要為門市營運負責，故給予絕對數字','【資安·仍不顯示任何金額】無論何種角色，本卡片一律不顯示單位成本、耗損金額、員餐金額、消失成本與毛利，且完全不讀取 catalog/costs 與 recon。已加測試驗證輸出文字不含「成本/金額/毛利/消失/$/元」等字樣','【效能】週狀態條由讀取 7 日擴充為 14 日（用於與上週比較），單次開啟首頁多 7 次讀取，量極小']},
@@ -1508,7 +1508,7 @@ function checkNewHireNotify(){
 (function (root) {
   'use strict';
 
-  var RECON_VERSION = '1.4.0';        // 勾稽引擎版本（勿與財會系統的 VER 混淆）
+  var RECON_VERSION = '1.5.0';        // 勾稽引擎版本（勿與財會系統的 VER 混淆）
 
   /* ─────────────────────────────────────────────────────────
    * 通路規則（config 驅動；新門市/加盟只改此處，不動邏輯）
@@ -1533,6 +1533,25 @@ function checkNewHireNotify(){
     // '交大店': { ... }  ← 依相同格式擴充
     // '總公司': { ... }
   };
+
+  /* ─────────────────────────────────────────────────────────
+   * 門市營業日型態（config 驅動；加盟新店只在此加一行，不動邏輯）
+   *   weekend  : 視為「離峰日」的星期代號（0=日 … 6=六）
+   *   台積電為園區廠辦店 —— 週末客量僅平日的 1/6。
+   *   若與平日混算日均，平日會備不夠（缺貨少賺），週末會大量報廢。
+   * ───────────────────────────────────────────────────────── */
+  var STORE_PROFILE = {
+    '台積電': { label: '廠辦型', weekend: [0, 6], offLabel: '週末' },
+    '_default': { label: '一般型', weekend: [], offLabel: '離峰' }
+  };
+  function profileOf(store) { return STORE_PROFILE[store] || STORE_PROFILE._default; }
+  function dayType(store, dateStr) {
+    var p = profileOf(store);
+    if (!p.weekend || !p.weekend.length) return '全期';
+    var d = new Date(String(dateStr) + 'T00:00:00');
+    if (isNaN(d.getTime())) return '全期';
+    return p.weekend.indexOf(d.getDay()) >= 0 ? (p.offLabel || '離峰') : '平日';
+  }
 
   /* 警戒閾值（可由呼叫端覆寫） */
   var THRESHOLD = {
@@ -1727,17 +1746,23 @@ function checkNewHireNotify(){
   function aggregate(days, products, store) {
     products = products || {};
     var rules = CHANNEL_RULES[store] || {};
-    var m = {}, dayCount = 0, dateSet = {};
+    var m = {}, dayCount = 0, dateSet = {}, dtDays = {};
     (days || []).forEach(function (d) {
       if (!d || !d.items || !d.items.length) return;
       dayCount++; dateSet[d.date] = true;
+      var dt = dayType(store, d.date);
+      dtDays[dt] = (dtDays[dt] || 0) + 1;
       d.items.forEach(function (it) {
         var k = it.sku + '|' + it.ch;
-        if (!m[k]) m[k] = { sku: it.sku, ch: it.ch, days: 0, pick: 0, sold: 0, staff: 0, scrap: 0 };
+        if (!m[k]) m[k] = { sku: it.sku, ch: it.ch, days: 0, pick: 0, sold: 0, staff: 0, scrap: 0, dt: {} };
         var r = m[k], rule = rules[it.ch] || {};
+        if (!r.dt[dt]) r.dt[dt] = { days: 0, pick: 0, sold: 0, staff: 0, scrap: 0 };
+        var b = r.dt[dt];
+        var pk = rule.hasPick ? n(it.pick) : (n(it.sold) + n(it.staff) + n(it.scrap));
         r.days++;
-        r.sold += n(it.sold); r.staff += n(it.staff); r.scrap += n(it.scrap);
-        r.pick += rule.hasPick ? n(it.pick) : (n(it.sold) + n(it.staff) + n(it.scrap));
+        r.sold += n(it.sold); r.staff += n(it.staff); r.scrap += n(it.scrap); r.pick += pk;
+        b.days++;
+        b.sold += n(it.sold); b.staff += n(it.staff); b.scrap += n(it.scrap); b.pick += pk;
       });
     });
     var byItem = Object.keys(m).map(function (k) {
@@ -1752,6 +1777,21 @@ function checkNewHireNotify(){
         shortRate: r.pick > 0 ? r2(short / r.pick * 1000) / 1000 : 0
       };
       o.prep = suggestPrep(o);
+      /* 依營業日型態分組 —— 平日與離峰日日均分開算，避免互相稀釋 */
+      o.byType = {};
+      Object.keys(r.dt || {}).forEach(function (dt) {
+        var b = r.dt[dt];
+        if (!b.days) return;
+        var bsr = (b.sold + b.scrap) > 0 ? b.scrap / (b.sold + b.scrap) : 0;
+        var e = {
+          dayType: dt, days: b.days, cat: o.cat, name: o.name, price: o.price, ch: o.ch, sku: o.sku,
+          sold: b.sold, staff: b.staff, scrap: b.scrap, made: b.pick,
+          avgSold: r2(b.sold / b.days), avgMade: r2(b.pick / b.days), avgStaff: r2(b.staff / b.days),
+          scrapRate: r2(bsr * 1000) / 1000
+        };
+        e.prep = suggestPrep(e);
+        o.byType[dt] = e;
+      });
       return o;
     });
     var byCat = {};
@@ -1770,7 +1810,16 @@ function checkNewHireNotify(){
     byItem.forEach(function (x) { T.sold += x.sold; T.scrap += x.scrap; T.staff += x.staff; T.short += x.short; T.made += x.made; });
     T.scrapRate = (T.sold + T.scrap) > 0 ? r2(T.scrap / (T.sold + T.scrap) * 1000) / 1000 : 0;
     T.shortRate = T.made > 0 ? r2(T.short / T.made * 1000) / 1000 : 0;
-    return { byItem: byItem, byCat: cats, total: T, days: dayCount, dates: Object.keys(dateSet).sort() };
+    var TORD = Object.keys(dtDays).sort(function (a, b) {
+      return (a === '平日' ? 0 : 1) - (b === '平日' ? 0 : 1);
+    });
+    return {
+      byItem: byItem, byCat: cats, total: T, days: dayCount,
+      dates: Object.keys(dateSet).sort(),
+      dayTypes: dtDays, typeOrder: TORD,
+      split: TORD.length > 1,
+      profile: profileOf(store)
+    };
   }
 
   /* ─────────────────────────────────────────────────────────
@@ -1809,6 +1858,9 @@ function checkNewHireNotify(){
   root.HaomingRecon = {
     VERSION: RECON_VERSION,
     CHANNEL_RULES: CHANNEL_RULES,
+    STORE_PROFILE: STORE_PROFILE,
+    profileOf: profileOf,
+    dayType: dayType,
     THRESHOLD: THRESHOLD,
     PREP: PREP,
     validate: validate,
@@ -1975,6 +2027,23 @@ if (typeof module !== 'undefined' && module.exports) module.exports = globalThis
     return '<div style="display:flex;justify-content:space-between;padding:6px 0"><span style="color:#64748b">' + k + '</span><span>' + v + '</span></div>';
   }
 
+  /* 建議備量：平日／週末分頁切換 */
+  W.HMPrepTab = function (i) {
+    for (var n = 0; ; n++) {
+      var el = document.getElementById('hmprep-' + n);
+      if (!el) break;
+      el.style.display = (n === i ? 'block' : 'none');
+    }
+    for (var b = 0; ; b++) {
+      var bt = document.getElementById('hmprepb-' + b);
+      if (!bt) break;
+      var on = (b === i);
+      bt.style.background = on ? '#1d4ed8' : '#fff';
+      bt.style.color = on ? '#fff' : '#334155';
+      bt.style.borderColor = on ? '#1d4ed8' : '#cbd5e1';
+    }
+  };
+
   /* 近 14 日：前 7 日畫狀態條，後 7 日用來做「較上週」比較（14 次讀取，量很小） */
   function loadWeek(fin) {
     var bar = $('app-week-bar'); if (!bar) return;
@@ -2006,7 +2075,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = globalThis
           + '<div style="font-size:11px;color:#64748b;margin-top:4px">' + W_[d.getDay()] + '</div></div>';
       }).join('');
       paintStats(agg(cur), agg(old), cur);
-      paintPrep(fin, cur);
+      paintPrep(fin, cur, days.map(dk));
     });
   }
 
@@ -2082,13 +2151,13 @@ if (typeof module !== 'undefined' && module.exports) module.exports = globalThis
    * 建議量由 HaomingRecon.suggestPrep 計算 —— 與財會系統同一份演算法。
    * ⚠ 一律不顯示金額：引擎的 aggregate/suggestPrep 只吃數量與售價，不需成本。
    *   售價本來就印在菜單上，員工看得到不構成資訊落差。 */
-  function paintPrep(fin, curList) {
+  function paintPrep(fin, curList, dateKeys) {
     var host = $('app-daily-record');
     if (!host || typeof W.HaomingRecon === 'undefined' || !W.HaomingRecon.aggregate) return;
     if (!W.__prepProducts) return;
 
     var days = [];
-    curList.forEach(function (v, i) { if (v) days.push({ date: 'd' + i, items: v.items || [] }); });
+    curList.forEach(function (v, i) { if (v) days.push({ date: (dateKeys && dateKeys[i]) || ('d' + i), items: v.items || [] }); });
     if (!days.length) return;
 
     var A = W.HaomingRecon.aggregate(days, W.__prepProducts, fin);
@@ -2118,29 +2187,52 @@ if (typeof module !== 'undefined' && module.exports) module.exports = globalThis
     h += '</div>';
 
     /* ── 建議製作數量 ── */
-    var list = A.byItem.filter(function (x) { return x.prep && x.prep.qty != null; })
-                 .sort(function (a, b) { return b.scrapRate - a.scrapRate || b.prep.qty - a.prep.qty; });
     var mto = A.byItem.filter(function (x) { return x.prep && x.prep.qty == null; });
+    var TO = (A.typeOrder && A.typeOrder.length) ? A.typeOrder : ['全期'];
+    var todayT = '';
+    try { todayT = W.HaomingRecon.dayType(fin, dk(new Date())); } catch (e) { }
+    var selI = Math.max(0, TO.indexOf(todayT));
+
     h += '<div class="card"><div style="font-size:16px;font-weight:700;color:#0f172a;margin-bottom:4px">📋 建議製作數量</div>'
-      + '<div style="font-size:12px;color:#64748b;margin-bottom:10px">依近 ' + A.days + ' 天平均銷量推算</div>';
-    if (A.days < 5) {
-      h += '<div style="background:#fef9c3;border-left:3px solid #ca8a04;padding:8px 10px;border-radius:6px;font-size:12px;color:#854d0e;margin-bottom:10px">'
-        + '⚠ 目前只有 ' + A.days + ' 天資料，數字僅供參考，會隨紀錄累積越來越準。</div>';
+      + '<div style="font-size:12px;color:#64748b;margin-bottom:10px">依近 ' + A.days + ' 天'
+      + (A.split ? '、平日與週末<b>分開</b>' : '') + '平均銷量推算</div>';
+
+    if (A.split) {
+      h += '<div style="display:flex;gap:8px;margin-bottom:10px">'
+        + TO.map(function (t, i) {
+            var on = (i === selI);
+            return '<button id="hmprepb-' + i + '" onclick="HMPrepTab(' + i + ')" style="flex:1;padding:9px 6px;border:1.5px solid ' + (on ? '#1d4ed8' : '#cbd5e1') + ';background:' + (on ? '#1d4ed8' : '#fff') + ';color:' + (on ? '#fff' : '#334155') + ';border-radius:9px;font-size:14px;font-weight:700">'
+              + esc(t) + (t === todayT ? '（今天）' : '') + '</button>';
+          }).join('')
+        + '</div>';
     }
-    h += '<table style="width:100%;font-size:13px;border-collapse:collapse">'
-      + '<tr style="color:#64748b;font-size:12px"><th style="text-align:left;padding:4px 0">品項</th>'
-      + '<th style="text-align:right;padding:4px 0">日均賣出</th><th style="text-align:right;padding:4px 0">建議做</th></tr>';
-    list.slice(0, 20).forEach(function (x) {
-      var bg = x.prep.lv === 'bad' ? '#fef2f2' : (x.prep.lv === 'warn' ? '#fffbeb' : '');
-      h += '<tr style="border-top:1px solid #f1f5f9;background:' + bg + '">'
-        + '<td style="padding:7px 0">' + esc(x.name)
-        + '<span style="color:#94a3b8;font-size:11px"> ' + esc(x.cat) + '·' + esc(x.ch) + '</span>'
-        + (x.prep.note ? '<div style="font-size:11px;color:#64748b">' + esc(x.prep.note) + '</div>' : '')
-        + '</td>'
-        + '<td style="text-align:right;padding:7px 0;color:#64748b">' + x.avgSold + '</td>'
-        + '<td style="text-align:right;padding:7px 0"><b style="font-size:17px;color:#14532d;background:#dcfce7;padding:2px 9px;border-radius:6px">' + x.prep.qty + '</b></td></tr>';
+
+    TO.forEach(function (t, i) {
+      var nd = A.dayTypes[t] || 0;
+      h += '<div id="hmprep-' + i + '" style="display:' + (i === selI ? 'block' : 'none') + '">';
+      if (nd < 5) {
+        h += '<div style="background:#fef9c3;border-left:3px solid #ca8a04;padding:8px 10px;border-radius:6px;font-size:12px;color:#854d0e;margin-bottom:10px">'
+          + '⚠ ' + esc(t) + '只有 ' + nd + ' 天資料，數字僅供參考，會隨紀錄累積越來越準。</div>';
+      }
+      var rows = A.byItem.map(function (x) { return (x.byType || {})[t]; })
+        .filter(function (e) { return e && e.prep && e.prep.qty != null; })
+        .sort(function (a, b) { return b.scrapRate - a.scrapRate || b.prep.qty - a.prep.qty; });
+      h += '<table style="width:100%;font-size:13px;border-collapse:collapse">'
+        + '<tr style="color:#64748b;font-size:12px"><th style="text-align:left;padding:4px 0">品項</th>'
+        + '<th style="text-align:right;padding:4px 0">日均賣出</th><th style="text-align:right;padding:4px 0">建議做</th></tr>';
+      rows.slice(0, 20).forEach(function (e) {
+        var bg = e.prep.lv === 'bad' ? '#fef2f2' : (e.prep.lv === 'warn' ? '#fffbeb' : '');
+        h += '<tr style="border-top:1px solid #f1f5f9;background:' + bg + '">'
+          + '<td style="padding:7px 0">' + esc(e.name)
+          + '<span style="color:#94a3b8;font-size:11px"> ' + esc(e.cat) + '·' + esc(e.ch) + '</span>'
+          + (e.prep.note ? '<div style="font-size:11px;color:#64748b">' + esc(e.prep.note) + '</div>' : '')
+          + '</td>'
+          + '<td style="text-align:right;padding:7px 0;color:#64748b">' + e.avgSold + '</td>'
+          + '<td style="text-align:right;padding:7px 0"><b style="font-size:17px;color:#14532d;background:#dcfce7;padding:2px 9px;border-radius:6px">' + e.prep.qty + '</b></td></tr>';
+      });
+      if (!rows.length) h += '<tr><td colspan="3" style="padding:10px 0;color:#94a3b8">此型態尚無足夠紀錄</td></tr>';
+      h += '</table></div>';
     });
-    h += '</table>';
     if (mto.length) {
       h += '<div style="margin-top:10px;padding:9px 11px;background:#f0fdfa;border-radius:7px;font-size:12px;color:#0f766e">'
         + '<b>接單現做（不預先製作）</b><br>'
