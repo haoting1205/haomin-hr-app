@@ -517,7 +517,7 @@ window.addEventListener('online',function(){_lastShSync=0;setTimeout(function(){
 
 function gpsDist(a,b,c,d){var R=6371000,dL=(c-a)*Math.PI/180,dN=(d-b)*Math.PI/180,x=Math.sin(dL/2)*Math.sin(dL/2)+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dN/2)*Math.sin(dN/2);return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x))}
 
-function appPunch(type){if(!curEmp){alert('未綁定員工');return}/* device binding removed */var pStore=document.getElementById('p-store');if(!pStore||!pStore.value){alert('請先選擇打卡門市');return}var _noGps=(!_lat||!_lng);if(_noGps){if(!confirm('\u26a0 \u76ee\u524d\u7121\u6cd5\u53d6\u5f97\u5b9a\u4f4d\n\n\u662f\u5426\u4ecd\u8981\u6253\u5361\uff1f\n\u6b64\u7b46\u5c07\u6a19\u8a18\u300c\u7121\u5b9a\u4f4d\u30fb\u5f85\u78ba\u8a8d\u300d\uff0c\u7531\u4e3b\u7ba1\u6838\u5c0d'))return}var _psh=storeHours[pStore.value]||STORE_GEO[pStore.value];if(!_psh){alert('門市設定錯誤');return}var _pd=null;if(!_noGps&&_psh.lat){_pd=gpsDist(_lat,_lng,_psh.lat,_psh.lng);var _tol=(_gpsAcc||0);if(_pd>((_psh.radius||200)+_tol)){alert('\u26a0 \u4e0d\u5728\u300c'+pStore.value+'\u300d\u7bc4\u570d\u5185\n\n\u76ee\u524d\u8ddd\u96e2\uff1a'+Math.round(_pd)+'m\uff08GPS\u8aa4\u5dee\u00b1'+Math.round(_gpsAcc||0)+'m\uff09\n\u5141\u8a31\u7bc4\u570d\uff1a'+(_psh.radius||200)+'m\n\n\u8acb\u5728\u9580\u5e02\u7bc4\u570d\u5185\u3001\u6216\u65bc\u7a7a\u66e0\u8655\u5f85\u5b9a\u4f4d\u7cbe\u6e96\u5f8c\u518d\u6253\u5361');return}}/* PIN已取消 */var now=new Date();var today=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());var time=pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds());var rec={id:'p'+Date.now(),eid:curEmp.id,name:curEmp.name,store:(pStore?pStore.value:curEmp.store)||'',date:today,time:time,type:type,gps:_lat?(_lat.toFixed(5)+','+_lng.toFixed(5)):'無定位',acc:(_gpsAcc?Math.round(_gpsAcc):null),dist:(_pd!==null&&_pd!==undefined?Math.round(_pd):null),needChk:(_noGps||(_gpsAcc||0)>500),ts:now.toISOString()};var local=JSON.parse(localStorage.getItem('hm_app_punch')||'[]');local.push(rec);localStorage.setItem('hm_app_punch',JSON.stringify(local));if(db&&navigator.onLine){db.collection(fbEnv+'_hrdata').doc('punchRecords').set({data:firebase.firestore.FieldValue.arrayUnion(rec)},{merge:true}).catch(function(e){saveOfflinePunch(rec)})}else{saveOfflinePunch(rec)}var res=document.getElementById('p-result');res.style.display='block';var tc=type==='上班'?'#166534':type==='下班'?'#991b1b':type==='外出'?'#92400e':'#0369a1';var bg=type==='上班'?'#dcfce7':type==='下班'?'#fee2e2':type==='外出'?'#fef3c7':'#e0f2fe';res.style.background=bg;res.style.color=tc;res.innerHTML='<div style="font-size:28px;margin-bottom:4px">'+(type==='上班'?'☀':type==='下班'?'🌙':type==='外出'?'🚶':'🏢')+'</div><div style="font-size:20px;font-weight:700">'+type+'打卡成功</div><div style="font-size:24px;font-weight:700;font-family:JetBrains Mono,monospace;margin-top:4px">'+time+'</div>';renderPunchToday()}
+function appPunch(type){if(!curEmp){alert('未綁定員工');return}/* device binding removed */var pStore=document.getElementById('p-store');if(!pStore||!pStore.value){alert('請先選擇打卡門市');return}var _noGps=(!_lat||!_lng);if(_noGps){if(!confirm('\u26a0 \u76ee\u524d\u7121\u6cd5\u53d6\u5f97\u5b9a\u4f4d\n\n\u662f\u5426\u4ecd\u8981\u6253\u5361\uff1f\n\u6b64\u7b46\u5c07\u6a19\u8a18\u300c\u7121\u5b9a\u4f4d\u30fb\u5f85\u78ba\u8a8d\u300d\uff0c\u7531\u4e3b\u7ba1\u6838\u5c0d'))return}var _psh=storeHours[pStore.value]||STORE_GEO[pStore.value];if(!_psh){alert('門市設定錯誤');return}var _pd=null;if(!_noGps&&_psh.lat){_pd=gpsDist(_lat,_lng,_psh.lat,_psh.lng);var _tol=(_gpsAcc||0);if(_pd>((_psh.radius||200)+_tol)){alert('\u26a0 \u4e0d\u5728\u300c'+pStore.value+'\u300d\u7bc4\u570d\u5185\n\n\u76ee\u524d\u8ddd\u96e2\uff1a'+Math.round(_pd)+'m\uff08GPS\u8aa4\u5dee\u00b1'+Math.round(_gpsAcc||0)+'m\uff09\n\u5141\u8a31\u7bc4\u570d\uff1a'+(_psh.radius||200)+'m\n\n\u8acb\u5728\u9580\u5e02\u7bc4\u570d\u5185\u3001\u6216\u65bc\u7a7a\u66e0\u8655\u5f85\u5b9a\u4f4d\u7cbe\u6e96\u5f8c\u518d\u6253\u5361');return}}/* PIN已取消 */var now=new Date();var today=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());var time=pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds());var rec={id:'p'+Date.now(),eid:curEmp.id,name:curEmp.name,store:(pStore?pStore.value:curEmp.store)||'',date:today,time:time,type:type,gps:_lat?(_lat.toFixed(5)+','+_lng.toFixed(5)):'無定位',acc:(_gpsAcc?Math.round(_gpsAcc):null),dist:(_pd!==null&&_pd!==undefined?Math.round(_pd):null),needChk:(_noGps||(_gpsAcc||0)>500),ts:now.toISOString()};var local=JSON.parse(localStorage.getItem('hm_app_punch')||'[]');local.push(rec);localStorage.setItem('hm_app_punch',JSON.stringify(local));if(db&&navigator.onLine){_punchDocOf(rec.date).set({data:firebase.firestore.FieldValue.arrayUnion(rec),ym:_appPmk(rec.date),updated:new Date().toISOString()},{merge:true}).catch(function(e){_appPunchFail(e,rec)})}else{saveOfflinePunch(rec)}var res=document.getElementById('p-result');res.style.display='block';var tc=type==='上班'?'#166534':type==='下班'?'#991b1b':type==='外出'?'#92400e':'#0369a1';var bg=type==='上班'?'#dcfce7':type==='下班'?'#fee2e2':type==='外出'?'#fef3c7':'#e0f2fe';res.style.background=bg;res.style.color=tc;res.innerHTML='<div style="font-size:28px;margin-bottom:4px">'+(type==='上班'?'☀':type==='下班'?'🌙':type==='外出'?'🚶':'🏢')+'</div><div style="font-size:20px;font-weight:700">'+type+'打卡成功</div><div style="font-size:24px;font-weight:700;font-family:JetBrains Mono,monospace;margin-top:4px">'+time+'</div>';renderPunchToday()}
 
 function renderPunchToday(){var now=new Date();var today=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());var local=JSON.parse(localStorage.getItem('hm_app_punch')||'[]');var recs=local.filter(function(r){return r.eid===(curEmp?curEmp.id:'')&&r.date===today}).sort(function(a,b){return a.time>b.time?1:-1});var h='';if(!recs.length)h='<div style="text-align:center;padding:16px;color:var(--gray4)">今日尚無打卡紀錄</div>';recs.forEach(function(r){var tc=r.type==='上班'?'#166534':r.type==='下班'?'#991b1b':r.type==='外出'?'#92400e':'#0369a1';var bg=r.type==='上班'?'#dcfce7':r.type==='下班'?'#fee2e2':r.type==='外出'?'#fef3c7':'#e0f2fe';h+='<div class="punch-row"><span style="background:'+bg+';color:'+tc+';padding:3px 10px;border-radius:8px;font-weight:700;font-size:12px;min-width:50px;text-align:center">'+r.type+'</span><span style="font-family:JetBrains Mono,monospace;font-weight:700;font-size:16px;margin-left:auto">'+r.time+'</span></div>'});document.getElementById('p-today').innerHTML=h}
 
@@ -629,11 +629,42 @@ function loadAppSurvey(){if(!curEmp||!db)return;db.collection(fbEnv+'_hrdata').d
 function submitAppSurvey(sid){if(!db)return;var scores=[];var buttons=document.querySelectorAll('[data-q]');var maxQ=0;buttons.forEach(function(b){var qi=+b.dataset.q;if(qi>maxQ)maxQ=qi;if(b.dataset.val)scores[qi]=+b.dataset.val});if(scores.filter(Boolean).length<maxQ+1){alert('請為每個項目評分');return}db.collection(fbEnv+'_hrdata').doc('survey').get().then(function(doc){var data=doc.exists?doc.data().data||[]:[];var s=data.find(function(x){return x.id===sid});if(!s)return;s.responses.push({eid:curEmp.id,scores:scores,date:new Date().toISOString()});db.collection(fbEnv+'_hrdata').doc('survey').set({data:data}).then(function(){alert('✅ 感謝您的回饋！（匿名提交）');loadAppSurvey()}).catch(function(e){alert('提交失敗')})}).catch(function(){})}
 
 
-function syncPunchFromFB(){if(!curEmp||!db)return;db.collection(fbEnv+'_hrdata').doc('punchRecords').get().then(function(doc){if(!doc.exists)return;var data=doc.data().data||[];var myToday=data.filter(function(r){var now=new Date();var today=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());return r.eid===curEmp.id&&r.date===today});if(myToday.length>0){var local=JSON.parse(localStorage.getItem('hm_app_punch')||'[]');myToday.forEach(function(r){if(!local.find(function(x){return x.id===r.id}))local.push(r)});localStorage.setItem('hm_app_punch',JSON.stringify(local));renderPunchToday()}}).catch(function(){})}
+/* ═══════════ [v3.17.0] 打卡紀錄月分片 ═══════════
+   舊版全公司的打卡塞在單一雲端文件裡用 arrayUnion 累加，Firestore 單一文件上限 1MB。
+   以三店約 450 筆/日估算，2026 年 9 月上旬就會撞到 —— 撞到之後**每一次打卡都會失敗
+   而且完全靜默**：你按了、畫面顯示成功、資料沒進去。
+   現在改成 prod_punch/{年月}。相容期內讀取會同時看新分片與舊文件。 */
+function _appPmk(d){var x=String(d||'');return /^\d{4}-\d{2}/.test(x)?x.substring(0,7):new Date().toISOString().substring(0,7)}
+function _punchDocOf(dateStr){return db.collection(fbEnv+'_punch').doc(_appPmk(dateStr))}
+/* 讀取指定月份清單（含舊文件），合併去重 */
+function _readPunchMonths(months){
+  if(!db)return Promise.resolve([]);
+  var jobs=months.map(function(m){
+    return db.collection(fbEnv+'_punch').doc(m).get()
+      .then(function(d){return (d.exists&&d.data().data)?d.data().data:[]}).catch(function(){return []});
+  });
+  jobs.push(db.collection(fbEnv+'_hrdata').doc('punchRecords').get()
+    .then(function(d){return (d.exists&&d.data().data)?d.data().data:[]}).catch(function(){return []}));
+  return Promise.all(jobs).then(function(arrs){
+    var seen={},out=[];
+    arrs.forEach(function(a){a.forEach(function(r){
+      if(!r)return;var k=r.id||(r.eid+'|'+r.date+'|'+r.time+'|'+r.type);
+      if(seen[k])return;seen[k]=1;out.push(r)})});
+    return out;
+  });
+}
+/* 打卡寫入雲端失敗絕對不可以靜默 */
+function _appPunchFail(e,rec){
+  console.error('[打卡] 寫入雲端失敗',e);
+  if(rec&&typeof saveOfflinePunch==='function')saveOfflinePunch(rec);
+}
+function syncPunchFromFB(){if(!curEmp||!db)return;_readPunchMonths([new Date().toISOString().substring(0,7)]).then(function(data){var myToday=data.filter(function(r){var now=new Date();var today=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());return r.eid===curEmp.id&&r.date===today});if(myToday.length>0){var local=JSON.parse(localStorage.getItem('hm_app_punch')||'[]');myToday.forEach(function(r){if(!local.find(function(x){return x.id===r.id}))local.push(r)});localStorage.setItem('hm_app_punch',JSON.stringify(local));renderPunchToday()}}).catch(function(){})}
 
 
-var APP_VERSION='3.15.0';
+var APP_VERSION='3.17.0';
 var APP_CHANGELOG=[
+{ver:'3.17.0',date:'2026-08-09',changes:['【★重大·打卡紀錄改為一個月一份】舊版全公司的打卡塞在單一雲端文件裡不斷累加，而雲端單一文件上限 1MB —— 以三店約 450 筆/日估算，2026 年 9 月上旬就會撞到。撞到之後每一次打卡都會失敗而且完全靜默：你按了、畫面顯示成功、資料其實沒進去', '【相容】讀取時新舊兩邊都會看，合併去重，過去的紀錄一筆都不會少', '【★修正·離線補送失敗不再靜默清空佇列】舊版補送失敗會直接吞掉錯誤；現在佇列保留，下次連線再試', '【用量】出勤報表只讀日期區間涵蓋到的月份，不再整包撈']},
+{ver:'3.16.0',date:'2026-08-09',changes:['【用量·待審徽章】原本每 1 分鐘讀 5 個雲端文件，2 位店長各開 8 小時就是約 4,800 次讀取/日，佔每日免費額度近一成，而且大部分時間數字根本沒變。改為 10 分鐘一次', '【用量·背景不輪詢】APP 切到背景時完全不讀雲端；切回前景會立刻補更新一次，看到的數字不會過期', '【不變】徽章數字、顯示規則、審核流程完全沒動；一般員工本來就不會觸發這段讀取']},
 {ver:'3.12.0',date:'2026-07-30',changes:['【新增·本週報廢分析】首頁列出近一週報廢最多的品項（份數與比率，紅色>15%、橘色>5%）。附註「報廢多半是一次做太多，不是賣不好」—— 這是現場改善的重點，不是檢討誰','【新增·建議製作數量】依近一週平均銷量算出每項該做多少，油炸品另給「首批做幾份、售完再炸」的分批建議，接單現做類（燒餅/河粉蛋餅/炒麵/虎咬豬）明確標示不需預先製作。資料不足5天時顯示提醒','【資安·仍完全不顯示金額】建議量演算法刻意只用「數量與售價」判斷，不使用單位成本 —— 員工APP 無成本讀取權限，若依賴成本兩邊會算出不同數字。已加測試驗證輸出不含「成本/金額/毛利/消失/營收/$/元」，且在無 catalog/costs 的情況下仍正常運作','【修改·分通路覆核】臨辦與櫃位改為各自顯示覆核狀態與時間，徽章新增「部分覆核」；本週狀況條新增藍色代表部分覆核。覆核進度改以 N/2 呈現','【一致性】建議量與財會系統共用同一份引擎演算法（HaomingRecon.suggestPrep），不會出現店員與老闆看到不同建議量的情況']},
 {ver:'3.11.0',date:'2026-07-27',changes:['【新增·本週表現（全體員工）】卡片新增相對指標：報廢較上週的增減趨勢（↓綠色代表改善）、本週登錄完成天數。刻意只顯示「比上週好或差」而非絕對比率——顯示絕對數字會讓人去猜門檻、把數字做漂亮，相對趨勢才反映真實努力','【新增·門市統計（僅店長/老闆）】依角色顯示近7日銷售份數、報廢份數與報廢率、員餐/檢體份數、短少份數與短少率（>2%標示需留意）。店長本就要為門市營運負責，故給予絕對數字','【資安·仍不顯示任何金額】無論何種角色，本卡片一律不顯示單位成本、耗損金額、員餐金額、消失成本與毛利，且完全不讀取 catalog/costs 與 recon。已加測試驗證輸出文字不含「成本/金額/毛利/消失/$/元」等字樣','【效能】週狀態條由讀取 7 日擴充為 14 日（用於與上週比較），單次開啟首頁多 7 次讀取，量極小']},
 {ver:'3.10.1',date:'2026-07-27',changes:['【一致性】首頁「今日紀錄」卡片的「員餐檢體」更名為「員餐/檢體」，與財會系統數量錄入頁用語統一（財會 v4.1.2 同步調整）']},
@@ -679,7 +710,23 @@ try{offlinePunchQueue=JSON.parse(localStorage.getItem('hm_offline_punch')||'[]')
 
 function saveOfflinePunch(rec){offlinePunchQueue.push(rec);localStorage.setItem('hm_offline_punch',JSON.stringify(offlinePunchQueue));showOfflineStatus()}
 
-function syncOfflinePunches(){if(!db||offlinePunchQueue.length===0)return;var queue=offlinePunchQueue.slice();db.collection(fbEnv+'_hrdata').doc('punchRecords').set({data:firebase.firestore.FieldValue.arrayUnion.apply(null,queue)},{merge:true}).then(function(){offlinePunchQueue=[];localStorage.removeItem('hm_offline_punch');showOfflineStatus();console.log('Synced '+queue.length+' offline punches')}).catch(function(){})}
+function syncOfflinePunches(){
+  if(!db||offlinePunchQueue.length===0)return;
+  var queue=offlinePunchQueue.slice();
+  /* [v3.17.0] 離線補送也要依日期分到正確的月份分片 */
+  var byM={};queue.forEach(function(r){var m=_appPmk(r&&r.date);(byM[m]=byM[m]||[]).push(r)});
+  var jobs=Object.keys(byM).map(function(m){
+    return db.collection(fbEnv+'_punch').doc(m)
+      .set({data:firebase.firestore.FieldValue.arrayUnion.apply(null,byM[m]),ym:m,updated:new Date().toISOString()},{merge:true});
+  });
+  Promise.all(jobs).then(function(){
+    offlinePunchQueue=[];localStorage.removeItem('hm_offline_punch');showOfflineStatus();
+    console.log('Synced '+queue.length+' offline punches');
+  }).catch(function(e){
+    /* 失敗時佇列保留，不清空 —— 舊版是靜默吞掉，下次還會再試 */
+    console.error('[打卡] 離線補送失敗，佇列保留',e);
+  });
+}
 
 function showOfflineStatus(){var el=document.getElementById('offline-badge');if(!el)return;if(offlinePunchQueue.length>0){el.style.display='block';el.textContent='📡 '+offlinePunchQueue.length+'筆待同步'}else{el.style.display='none'}}
 
@@ -723,7 +770,27 @@ function checkMgrRole(){
 
 function setApproveBadge(n){var b=document.getElementById('appr-badge');if(!b)return;if(n>0){b.textContent=n>99?'99+':String(n);b.style.display='inline-flex';}else{b.style.display='none';}}
 function updateApproveBadge(){if(!db||!mgrRole)return;var col=db.collection(fbEnv+'_hrdata');Promise.all([col.doc('leave').get(),col.doc('otRecords').get(),col.doc('swapRecords').get(),col.doc('preLeave').get(),col.doc('punchApplies').get()]).then(function(rs){var n=0;var lv=rs[0].exists?(rs[0].data().leaveRecords||[]):[];n+=lv.filter(function(x){return x.status==='待簽核'||x.status==='店長核准'}).length;[1,2,3,4].forEach(function(i){var d=rs[i].exists?(rs[i].data().data||[]):[];n+=d.filter(function(x){return x.status==='待審核'}).length;});setApproveBadge(n);}).catch(function(){});}
-var _apprTimer=null;function startApproveBadgePolling(){if(_apprTimer)return;updateApproveBadge();_apprTimer=setInterval(function(){if(mgrRole)updateApproveBadge();else{clearInterval(_apprTimer);_apprTimer=null;}},60000);}
+var _apprTimer=null;
+/* [v3.16.0] 待審徽章原本每 1 分鐘讀 5 個 Firestore 文件。
+   2 位店長各開 8 小時 = 約 4,800 次讀取/日，佔每日免費額度近 10%，
+   而且大部分時間數字根本沒變（審核不是秒級需求）。
+   改為 10 分鐘一次，且分頁在背景時直接跳過 —— 手機 APP 大部分時間在背景，
+   這一項比拉長間隔省得更多。切回前景時會立刻補更新一次，不會看到過期的數字。 */
+function startApproveBadgePolling(){
+  if(_apprTimer)return;
+  updateApproveBadge();
+  _apprTimer=setInterval(function(){
+    if(!mgrRole){clearInterval(_apprTimer);_apprTimer=null;return}
+    if(document.hidden)return;
+    updateApproveBadge();
+  },600000);
+  if(!window._apprVisBound){
+    window._apprVisBound=1;
+    document.addEventListener('visibilitychange',function(){
+      if(!document.hidden&&mgrRole)updateApproveBadge();
+    });
+  }
+}
 
 function loadMgrApprove(){
   if(!db||!mgrRole)return;
@@ -804,7 +871,7 @@ function mgrRejectSwap(id){var reason=prompt('拒絕原因：');if(!reason)retur
 function mgrApprovePL(id){if(!confirm('確認核准？'))return;db.collection(fbEnv+'_hrdata').doc('preLeave').get().then(function(doc){var data=doc.data().data||[];var r=data.find(function(x){return x.id===id});if(r)r.status='已核准';db.collection(fbEnv+'_hrdata').doc('preLeave').set({data:data}).then(function(){alert('✅ 已核准');loadMgrApprove()})}).catch(function(e){alert('失敗：'+e.message)})}
 function mgrRejectPL(id){var reason=prompt('拒絕原因：');if(!reason)return;db.collection(fbEnv+'_hrdata').doc('preLeave').get().then(function(doc){var data=doc.data().data||[];var r=data.find(function(x){return x.id===id});if(r){r.status='已拒絕';r.rejectReason=reason}db.collection(fbEnv+'_hrdata').doc('preLeave').set({data:data}).then(function(){alert('已拒絕');loadMgrApprove()})}).catch(function(e){alert('失敗：'+e.message)})}
 
-function mgrApproveMakeup(id){if(!confirm('確認核准補打卡？'))return;db.collection(fbEnv+'_hrdata').doc('punchApplies').get().then(function(doc){var data=doc.data().data||[];var r=data.find(function(x){return x.id===id});if(r){r.status='已核准';db.collection(fbEnv+'_hrdata').doc('punchApplies').set({data:data});db.collection(fbEnv+'_hrdata').doc('punchRecords').set({data:firebase.firestore.FieldValue.arrayUnion({id:'p'+Date.now(),eid:r.eid,name:r.name,store:r.store,date:r.date,time:r.time,type:r.type,gps:'補打卡(APP)',ts:new Date().toISOString()})},{merge:true}).then(function(){alert('✅ 已核准，打卡紀錄已寫入');loadMgrApprove()})}}).catch(function(e){alert('失敗：'+e.message)})}
+function mgrApproveMakeup(id){if(!confirm('確認核准補打卡？'))return;db.collection(fbEnv+'_hrdata').doc('punchApplies').get().then(function(doc){var data=doc.data().data||[];var r=data.find(function(x){return x.id===id});if(r){r.status='已核准';db.collection(fbEnv+'_hrdata').doc('punchApplies').set({data:data});_punchDocOf(r.date).set({data:firebase.firestore.FieldValue.arrayUnion({id:'p'+Date.now(),eid:r.eid,name:r.name,store:r.store,date:r.date,time:r.time,type:r.type,gps:'補打卡(APP)',ts:new Date().toISOString()}),ym:_appPmk(r.date),updated:new Date().toISOString()},{merge:true}).then(function(){alert('✅ 已核准，打卡紀錄已寫入');loadMgrApprove()})}}).catch(function(e){alert('失敗：'+e.message)})}
 function mgrRejectMakeup(id){var reason=prompt('拒絕原因：');if(!reason)return;db.collection(fbEnv+'_hrdata').doc('punchApplies').get().then(function(doc){var data=doc.data().data||[];var r=data.find(function(x){return x.id===id});if(r){r.status='已拒絕';r.rejectReason=reason}db.collection(fbEnv+'_hrdata').doc('punchApplies').set({data:data}).then(function(){alert('已拒絕');loadMgrApprove()})}).catch(function(e){alert('失敗：'+e.message)})}
 
 // Attendance
@@ -816,8 +883,7 @@ function loadMgrAttend(){
   sel.innerHTML='<option value="">全部員工</option>';
   staff.forEach(function(e){if(!e.leave_date)sel.innerHTML+='<option value="'+e.id+'">'+e.name+'</option>'});
   
-  db.collection(fbEnv+'_hrdata').doc('punchRecords').get().then(function(doc){
-    var data=doc.exists?doc.data().data||[]:[];
+  _readPunchMonths([_appPmk(today)]).then(function(data){
     var todayPunches=data.filter(function(r){return r.date===today});
     var h='<div style="font-size:12px;color:#666;margin-bottom:8px">'+today+' 共 '+todayPunches.length+' 筆打卡</div>';
     var byEmp={};
@@ -875,8 +941,10 @@ function mgrSearchPunch(){
   var d2=document.getElementById('mgr-att-d2').value;
   if(!d1||!d2){alert('請選擇起訖日期');return}
   if(d1>d2){var _tmp=d1;d1=d2;d2=_tmp;document.getElementById('mgr-att-d1').value=d1;document.getElementById('mgr-att-d2').value=d2;}
-  db.collection(fbEnv+'_hrdata').doc('punchRecords').get().then(function(doc){
-    var data=doc.exists?doc.data().data||[]:[];
+  /* [v3.17.0] 只讀區間涵蓋到的月份分片，不再整包撈 */
+  var _ms=[],_c=new Date(d1.substring(0,7)+'-01'),_end=d2.substring(0,7);
+  for(var _g=0;_g<36;_g++){var _k=_c.toISOString().substring(0,7);_ms.push(_k);if(_k>=_end)break;_c.setMonth(_c.getMonth()+1)}
+  _readPunchMonths(_ms).then(function(data){
     var filtered=data.filter(function(r){
       if(eid&&r.eid!==eid)return false;
       return r.date>=d1&&r.date<=d2;
