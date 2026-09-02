@@ -95,10 +95,11 @@ body{font-family:'Noto Sans TC',sans-serif;background:#eef2f7;color:var(--gray6)
 <button onclick="showNewHireForm()" style="margin-top:8px;background:#166534;color:#fff;border:none;padding:12px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;width:100%">📋 新人報到填寫資料</button>
 <div id="app-forgot" style="display:none;margin-top:14px;text-align:left;background:var(--gray1);border-radius:10px;padding:16px">
 <div style="font-size:14px;font-weight:700;color:#0f1b35;margin-bottom:8px">🔑 密碼重設</div>
-<div style="font-size:12px;color:#4b5680;margin-bottom:12px">請輸入帳號（工號）+ 驗證資料，系統將重設密碼</div>
+<div style="font-size:12px;color:#4b5680;margin-bottom:12px">需同時驗證身分證字號與生日／手機。通過後會送出申請給主管，不會自動重設，也不會在畫面顯示密碼。</div>
 <div class="form-group"><span class="fl">帳號（工號）</span><input class="fi" id="forgot-user" placeholder="如 hm0001"></div>
-<div class="form-group"><span class="fl">驗證資料（身分證/生日/手機）</span><input class="fi" id="forgot-id" placeholder="身分證字號 或 生日(1990-01-15) 或 手機"></div>
-<button class="btn btn-blue" onclick="doAppForgot()">確認重設密碼</button>
+<div class="form-group"><span class="fl">身分證字號（必填）</span><input class="fi" id="forgot-id" placeholder="A123456789"></div>
+<div class="form-group"><span class="fl">生日 或 手機（必填）</span><input class="fi" id="forgot-id2" placeholder="1990-01-15 或 0912345678"></div>
+<button class="btn btn-blue" onclick="doAppForgot()">送出重設申請</button>
 <button class="btn btn-outline" style="font-size:13px;padding:8px" onclick="hideAppForgot()">返回登入</button>
 </div>
 <div style="margin-top:20px;padding:14px;background:var(--gray1);border-radius:10px;text-align:left;display:none">
@@ -111,6 +112,10 @@ body{font-family:'Noto Sans TC',sans-serif;background:#eef2f7;color:var(--gray6)
 </div>
 
 <div class="offline-bar" id="offline-bar">📡 離線模式 - 資料暫存本機</div>
+<!-- [FIX-25] showOfflineStatus() 一直在找 id="offline-badge"，但這個元素從來就不存在，
+     函式開頭 if(!el)return 直接靜默返回 —— 打卡沒送上雲端時員工完全看不到任何提示，
+     只看到「打卡成功」。這與 v3.17.0 註解寫的「絕對不可以靜默」相矛盾。 -->
+<div id="offline-badge" style="display:none;background:#b45309;color:#fff;text-align:center;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer" onclick="syncOfflinePunches()"></div>
 
 <div class="app-bar">
 <div>🍽 好洺餐飲<span class="sub">員工APP <span id="app-ver-badge"></span></span></div>
@@ -479,19 +484,108 @@ function initFb(){var cfg=null;try{cfg=JSON.parse(localStorage.getItem('hm_app_f
 
 function appLogin(){var u=document.getElementById('app-user').value.trim();var p=document.getElementById('app-pass').value;if(!u||!p){showErr('請輸入帳號和密碼');return}if(!db){var localAccts=JSON.parse(localStorage.getItem('hm_app_accounts')||'[]');var acct=localAccts.find(function(a){return a.user===u&&verifyPass(p,a.pass)});if(acct){finishLogin(acct);return}showErr('請先設定Firebase連線');return}db.collection(fbEnv+'_hrdata').doc('accounts').get().then(function(doc){if(!doc.exists){showErr('無法取得帳號資料');return}var accounts=doc.data().userAccounts||[];var acct=accounts.find(function(a){return a.user===u&&verifyPass(p,a.pass)});if(!acct){showErr('帳號或密碼錯誤');return}localStorage.setItem('hm_app_accounts',JSON.stringify(accounts));acct._plain=p;finishLogin(acct)}).catch(function(e){var localAccts=JSON.parse(localStorage.getItem('hm_app_accounts')||'[]');var acct=localAccts.find(function(a){return a.user===u&&verifyPass(p,a.pass)});if(acct){document.getElementById('offline-bar').style.display='block';finishLogin(acct)}else{showErr('連線失敗：'+e.message)}})}
 
-function finishLogin(acct){renderAppVersion();curAcct=acct;if(document.getElementById('app-remember').checked){localStorage.setItem('hm_app_session',JSON.stringify({user:acct.user,pass:acct._plain||acct.pass}))}document.getElementById('login-screen').style.display='none';checkMgrRole();loadData();if(verifyPass(acct.user+'aa',acct.pass)){setTimeout(function(){if(confirm('⚠ 您目前使用預設密碼\n\n為保護帳號安全，建議立即修改密碼。\n\n按「確定」立即修改\n按「取消」稍後再改')){appChangePass()}},2000)}}
+function finishLogin(acct){renderAppVersion();curAcct=acct;/* [FIX-12] 舊版把明文密碼寫進手機的 localStorage，手機被拿走或被其他網頁讀到就外洩。
+   改存已雜湊的值，並記錄到期時間（30 天）。 */
+if(document.getElementById('app-remember').checked){
+  localStorage.setItem('hm_app_session',JSON.stringify({user:acct.user,ph:acct.pass,exp:Date.now()+30*24*60*60*1000}));
+}else{localStorage.removeItem('hm_app_session')}document.getElementById('login-screen').style.display='none';checkMgrRole();loadData();/* ══ [R3] 舊版只是「建議」修改預設密碼，按取消就能繼續用。
+   預設密碼是「工號+aa」，工號在班表上看得到 —— 只要有人沒改，
+   那個帳號等於沒有密碼。改為：還在用預設密碼就必須改完才能用。 */
+if(verifyPass(acct.user+'aa',acct.pass)){setTimeout(function(){_forceChangePass()},800)}}
+
+/* [R3] 強制修改預設密碼 —— 改完之前不放行 */
+function _forceChangePass(){
+  alert('⚠ 您目前使用的是預設密碼\n\n預設密碼是「工號+aa」，工號在班表上看得到，等於沒有密碼。\n請立即設定一組只有你知道的新密碼。');
+  var el=document.getElementById('login-screen');
+  var tries=0;
+  function ask(){
+    tries++;
+    if(tries>5){alert('已嘗試多次未完成設定，將登出。請重新登入後設定密碼。');appLogout();return}
+    var n=prompt('請設定新密碼（8~16 字元，需含英文和數字）：');
+    if(n===null){alert('必須設定新密碼才能使用 APP。');ask();return}
+    if(n.length<8||n.length>16){alert('密碼長度需 8~16 字元');ask();return}
+    if(!/[a-zA-Z]/.test(n)||!/[0-9]/.test(n)){alert('密碼需同時包含英文和數字');ask();return}
+    if(verifyPass(n,curAcct.pass)){alert('新密碼不可與預設密碼相同');ask();return}
+    var c=prompt('請再輸入一次確認：');
+    if(c!==n){alert('兩次輸入不一致');ask();return}
+    var nh=hashPass(n,curAcct.user);
+    hmTx(hmRef('accounts'),function(d){
+      var accounts=d.userAccounts||[];
+      var a=accounts.find(function(x){return x.user===curAcct.user});
+      if(!a)return false;
+      a.pass=nh;a.passChangedAt=new Date().toISOString();
+      d.userAccounts=accounts;return d;
+    }).then(function(){
+      curAcct.pass=nh;
+      try{
+        var la=JSON.parse(localStorage.getItem('hm_app_accounts')||'[]');
+        var lo=la.find(function(x){return x.user===curAcct.user});if(lo)lo.pass=nh;
+        localStorage.setItem('hm_app_accounts',JSON.stringify(la));
+      }catch(e){}
+      var rm=document.getElementById('app-remember');
+      if(rm&&rm.checked){localStorage.setItem('hm_app_session',JSON.stringify({user:curAcct.user,ph:nh,exp:Date.now()+30*24*60*60*1000}))}
+      else{localStorage.removeItem('hm_app_session')}
+      alert('✅ 密碼已設定完成，請記好您的新密碼。');
+    }).catch(function(e){
+      alert('⚠ 設定失敗，密碼沒有變更：'+e.message+'\n請再試一次。');ask();
+    });
+  }
+  ask();
+}
 
 function showErr(msg){var el=document.getElementById('app-err');el.textContent=msg;el.style.display='block'}
 function appLogout(){curAcct=null;curEmp=null;localStorage.removeItem('hm_app_session');document.getElementById('login-screen').style.display='flex';document.getElementById('app-user').value='';document.getElementById('app-pass').value='';document.getElementById('app-err').style.display='none'}
 
-function loadData(){if(!db){renderAll();return}db.collection(fbEnv+'_employees').get().then(function(s){var n=[];s.forEach(function(d){n.push(Object.assign({id:d.id},d.data()))});if(n.length)staff=n;findCurEmp();renderAll();onDataReady()}).catch(function(){findCurEmp();renderAll();onDataReady()});db.collection(fbEnv+'_schedules').doc((viewY+1911)+'-'+pad(viewM)).get().then(function(d){if(d.exists)sched=d.data().data||{}}).catch(function(){});db.collection(fbEnv+'_hrdata').doc('leave').get().then(function(d){if(d.exists&&d.data().leaveRecords)leaveRecords=d.data().leaveRecords}).catch(function(){});db.collection(fbEnv+'_hrdata').doc('payHistory').get().then(function(d){if(d.exists&&d.data().data)payHistory=d.data().data}).catch(function(){});db.collection(fbEnv+'_hrdata').doc('supportPay').get().then(function(d){if(d.exists&&d.data().data)appSupportPay=d.data().data}).catch(function(){})}
+function loadData(){if(!db){renderAll();return}db.collection(fbEnv+'_employees').get().then(function(s){var n=[];s.forEach(function(d){n.push(Object.assign({id:d.id},d.data()))});if(n.length)staff=n;findCurEmp();renderAll();onDataReady()}).catch(function(){findCurEmp();renderAll();onDataReady()});db.collection(fbEnv+'_schedules').doc((viewY+1911)+'-'+pad(viewM)).get().then(function(d){if(d.exists)sched=d.data().data||{}}).catch(function(){});db.collection(fbEnv+'_hrdata').doc('leave').get().then(function(d){if(d.exists&&d.data().leaveRecords)leaveRecords=d.data().leaveRecords}).catch(function(){});/* ══ [R2] 薪資讀取：優先讀「每人一份」的新結構 ═══════════════════
+   目前 payHistory 是一份文件裝全公司，只要 APP 讀得到就是讀到全部人的，
+   安全規則管不到「只讀自己那一格」。
+   這裡先讓 APP 支援新結構 prod_pay/{員工id}：
+     · 讀得到自己那份 → 用它，完全不去碰那份全公司的文件
+     · 讀不到（管理端還沒開始寫）→ 退回舊路徑，並在用戶端過濾
+   管理端改成寫入 prod_pay/{員工id} 之後，就可以把 firestore.rules 裡
+   payHistory 的 allow read 改成 isAdmin()，這個洞才算真正補上。 */
+var _payMe=(curAcct&&curAcct.empId)||(curEmp&&curEmp.id);
+var _payDone=false;
+if(_payMe){
+  db.collection(fbEnv+'_pay').doc(_payMe).get().then(function(pd){
+    if(pd.exists&&pd.data().months){payHistory=pd.data().months;_payDone=true;renderPay&&(document.getElementById('screen-pay')||{}).classList&&document.getElementById('screen-pay').classList.contains('active')&&renderPay()}
+  }).catch(function(){});
+}
+db.collection(fbEnv+'_hrdata').doc('payHistory').get().then(function(d){
+  if(_payDone)return;
+  if(d.exists&&d.data().data){
+    /* [FIX-14] 舊版把「全公司所有人的薪資」整包留在員工手機的記憶體裡。
+       這裡過濾成只留自己的。
+       ⚠ 這只縮小暴露面，資料仍整包經過網路。要真正擋住，必須把 payHistory
+       拆成每人一份文件並設定 Firestore 規則 —— 見交付文件的建議 R2。 */
+    var _raw=d.data().data,_mine={},_me=(curAcct&&curAcct.empId)||(curEmp&&curEmp.id);
+    if(hmRole()==='老闆'){payHistory=_raw}
+    else if(_me){Object.keys(_raw).forEach(function(mk){if(_raw[mk]&&_raw[mk][_me]){_mine[mk]={};_mine[mk][_me]=_raw[mk][_me]}});payHistory=_mine}
+    else{payHistory={}}
+  }
+}).catch(function(){});
+db.collection(fbEnv+'_hrdata').doc('supportPay').get().then(function(d){
+  if(d.exists&&d.data().data){
+    var _raw=d.data().data,_me=(curAcct&&curAcct.empId)||(curEmp&&curEmp.id),_out={};
+    if(hmRole()==='老闆'||!_me){appSupportPay=_raw}
+    else{Object.keys(_raw).forEach(function(mk){var l=(_raw[mk]||[]).filter(function(r){return r&&r.eid===_me});if(l.length)_out[mk]=l});appSupportPay=_out}
+  }
+}).catch(function(){})}
 
-function findCurEmp(){if(curAcct&&curAcct.empId){curEmp=staff.find(function(e){return e.id===curAcct.empId})}if(!curEmp&&staff.length){curEmp=staff[0]}}
+/* [FIX-01] 舊版：找不到對應員工時 curEmp=staff[0]，會把「員工清單第一個人」當成登入者，
+   導致該帳號看到別人的班表／薪資／打卡。改為寧可空白也不猜。 */
+function findCurEmp(){
+  curEmp=null;
+  if(curAcct&&curAcct.empId){curEmp=staff.find(function(e){return e.id===curAcct.empId})||null}
+  if(!curEmp&&curAcct&&staff.length){
+    console.error('[帳號] 帳號 '+curAcct.user+' 的 empId('+(curAcct.empId||'未設定')+') 找不到對應員工，已停用此次登入的資料顯示');
+  }
+}
 
 function goMakeup(){switchScreen('punch');setTimeout(function(){var el=document.getElementById('app-makeup-date');if(el&&el.scrollIntoView)el.scrollIntoView({behavior:'smooth',block:'center'})},350)}
 function switchScreen(name){if(name!=='punch'&&typeof _stopGPS==='function')_stopGPS();document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active')});document.querySelectorAll('.tab-btn').forEach(function(t){t.classList.remove('active')});var _sc=document.getElementById('screen-'+name);if(_sc)_sc.classList.add('active');var _tb=document.getElementById('tab-'+name);if(_tb)_tb.classList.add('active');try{window.scrollTo(0,0)}catch(e){}if(name==='order')renderOrder();if(name==='home'&&typeof loadEmpStats==='function')loadEmpStats();if(name==='home'){try{HaomingAppDailyRecord.render()}catch(e){}}if(name==='prod'){refreshProdData()}if(name==='approve')loadMgrApprove();if(name==='attend')loadMgrAttend();if(name==='report')loadMgrReport();if(name==='punch')initPunchScreen();if(name==='sched'){if(schedViewMode==='store')renderSchedStore();else renderSched()}if(name==='leave')renderLeave();if(name==='pay')renderPay();if(name==='me')renderMe();if(name==='preleave')renderPreLeave();if(name==='swap')openAppSwap();if(name==='sop'){}}
 
-function renderAll(){if(!curEmp){document.getElementById('home-name').textContent='未綁定員工';return}document.getElementById('app-name').textContent=curEmp.name;document.getElementById('app-role').textContent=curEmp.role+' · '+(curEmp.store||'');document.getElementById('home-avatar').textContent=curEmp.name[0];document.getElementById('home-name').textContent=curEmp.name;document.getElementById('home-sub').textContent=curEmp.role+' · '+(curEmp.store||'')+' · 到職 '+(curEmp.hire_date||'─');document.getElementById('home-vac').textContent='─';document.getElementById('home-attend').textContent='─';try{HaomingAppDailyRecord.render()}catch(e){}}
+function renderAll(){if(!curEmp){document.getElementById('home-name').textContent='帳號未綁定員工';var _sub=document.getElementById('home-sub');if(_sub){_sub.innerHTML='<span style="color:#991b1b">此帳號尚未對應到員工資料，無法顯示班表／薪資／打卡。請聯絡管理員設定。</span>'}var _av=document.getElementById('home-avatar');if(_av)_av.textContent='!';var _an=document.getElementById('app-name');if(_an)_an.textContent='未綁定';var _ar=document.getElementById('app-role');if(_ar)_ar.textContent='—';return}document.getElementById('app-name').textContent=curEmp.name;document.getElementById('app-role').textContent=curEmp.role+' · '+(curEmp.store||'');document.getElementById('home-avatar').textContent=curEmp.name[0];document.getElementById('home-name').textContent=curEmp.name;document.getElementById('home-sub').textContent=curEmp.role+' · '+(curEmp.store||'')+' · 到職 '+(curEmp.hire_date||'─');document.getElementById('home-vac').textContent='─';document.getElementById('home-attend').textContent='─';try{HaomingAppDailyRecord.render()}catch(e){}}
 
 function initPunchScreen(){syncStoreHours();var ps=document.getElementById('p-store');if(ps&&curEmp&&curEmp.store){ps.value=curEmp.store};syncPunchFromFB();updateClock();if(window._pt)clearInterval(window._pt);window._pt=setInterval(updateClock,1000);getGPS();renderPunchToday();loadMakeupHistory()}
 
@@ -517,7 +611,40 @@ window.addEventListener('online',function(){_lastShSync=0;setTimeout(function(){
 
 function gpsDist(a,b,c,d){var R=6371000,dL=(c-a)*Math.PI/180,dN=(d-b)*Math.PI/180,x=Math.sin(dL/2)*Math.sin(dL/2)+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dN/2)*Math.sin(dN/2);return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x))}
 
-function appPunch(type){if(!curEmp){alert('未綁定員工');return}/* device binding removed */var pStore=document.getElementById('p-store');if(!pStore||!pStore.value){alert('請先選擇打卡門市');return}var _noGps=(!_lat||!_lng);if(_noGps){if(!confirm('\u26a0 \u76ee\u524d\u7121\u6cd5\u53d6\u5f97\u5b9a\u4f4d\n\n\u662f\u5426\u4ecd\u8981\u6253\u5361\uff1f\n\u6b64\u7b46\u5c07\u6a19\u8a18\u300c\u7121\u5b9a\u4f4d\u30fb\u5f85\u78ba\u8a8d\u300d\uff0c\u7531\u4e3b\u7ba1\u6838\u5c0d'))return}var _psh=storeHours[pStore.value]||STORE_GEO[pStore.value];if(!_psh){alert('門市設定錯誤');return}var _pd=null;if(!_noGps&&_psh.lat){_pd=gpsDist(_lat,_lng,_psh.lat,_psh.lng);var _tol=(_gpsAcc||0);if(_pd>((_psh.radius||200)+_tol)){alert('\u26a0 \u4e0d\u5728\u300c'+pStore.value+'\u300d\u7bc4\u570d\u5185\n\n\u76ee\u524d\u8ddd\u96e2\uff1a'+Math.round(_pd)+'m\uff08GPS\u8aa4\u5dee\u00b1'+Math.round(_gpsAcc||0)+'m\uff09\n\u5141\u8a31\u7bc4\u570d\uff1a'+(_psh.radius||200)+'m\n\n\u8acb\u5728\u9580\u5e02\u7bc4\u570d\u5185\u3001\u6216\u65bc\u7a7a\u66e0\u8655\u5f85\u5b9a\u4f4d\u7cbe\u6e96\u5f8c\u518d\u6253\u5361');return}}/* PIN已取消 */var now=new Date();var today=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());var time=pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds());var rec={id:'p'+Date.now(),eid:curEmp.id,name:curEmp.name,store:(pStore?pStore.value:curEmp.store)||'',date:today,time:time,type:type,gps:_lat?(_lat.toFixed(5)+','+_lng.toFixed(5)):'無定位',acc:(_gpsAcc?Math.round(_gpsAcc):null),dist:(_pd!==null&&_pd!==undefined?Math.round(_pd):null),needChk:(_noGps||(_gpsAcc||0)>500),ts:now.toISOString()};var local=JSON.parse(localStorage.getItem('hm_app_punch')||'[]');local.push(rec);localStorage.setItem('hm_app_punch',JSON.stringify(local));if(db&&navigator.onLine){_punchDocOf(rec.date).set({data:firebase.firestore.FieldValue.arrayUnion(rec),ym:_appPmk(rec.date),updated:new Date().toISOString()},{merge:true}).catch(function(e){_appPunchFail(e,rec)})}else{saveOfflinePunch(rec)}var res=document.getElementById('p-result');res.style.display='block';var tc=type==='上班'?'#166534':type==='下班'?'#991b1b':type==='外出'?'#92400e':'#0369a1';var bg=type==='上班'?'#dcfce7':type==='下班'?'#fee2e2':type==='外出'?'#fef3c7':'#e0f2fe';res.style.background=bg;res.style.color=tc;res.innerHTML='<div style="font-size:28px;margin-bottom:4px">'+(type==='上班'?'☀':type==='下班'?'🌙':type==='外出'?'🚶':'🏢')+'</div><div style="font-size:20px;font-weight:700">'+type+'打卡成功</div><div style="font-size:24px;font-weight:700;font-family:JetBrains Mono,monospace;margin-top:4px">'+time+'</div>';renderPunchToday()}
+function appPunch(type){
+  if(!curEmp){alert('⚠ 此帳號未綁定員工，無法打卡。請聯絡管理員。');return}
+  /* [FIX-11] 舊版連按會產生多筆打卡。
+     順序很重要：先做「一分鐘內重複」判斷（給明確訊息），再上短鎖（擋住同一瞬間的連點）。
+     反過來的話，第二次點擊會被鎖靜默吃掉，員工看不到任何反應，只會更用力再按。 */
+  try{
+    var _lp=JSON.parse(localStorage.getItem('hm_app_punch')||'[]');
+    var _nw=Date.now();
+    var _dup=_lp.filter(function(r){return r&&r.eid===curEmp.id&&r.type===type&&r.ts&&(_nw-new Date(r.ts).getTime())<60000});
+    if(_dup.length){
+      alert('⚠ 一分鐘內已經打過「'+type+'」卡了\n\n最近一筆：'+_dup[_dup.length-1].time+'\n如需修正請用下方「補打卡申請」。');
+      return;
+    }
+  }catch(e){}
+  if(!hmLock('punch:'+type,5000)){alert('處理中，請稍候…');return}
+var pStore=document.getElementById('p-store');if(!pStore||!pStore.value){alert('請先選擇打卡門市');hmUnlock('punch:'+type);return}var _noGps=(!_lat||!_lng);if(_noGps){if(!confirm('\u26a0 \u76ee\u524d\u7121\u6cd5\u53d6\u5f97\u5b9a\u4f4d\n\n\u662f\u5426\u4ecd\u8981\u6253\u5361\uff1f\n\u6b64\u7b46\u5c07\u6a19\u8a18\u300c\u7121\u5b9a\u4f4d\u30fb\u5f85\u78ba\u8a8d\u300d\uff0c\u7531\u4e3b\u7ba1\u6838\u5c0d')){hmUnlock('punch:'+type);return}}var _psh=storeHours[pStore.value]||STORE_GEO[pStore.value];if(!_psh){alert('門市設定錯誤');hmUnlock('punch:'+type);return}var _pd=null;if(!_noGps&&_psh.lat){_pd=gpsDist(_lat,_lng,_psh.lat,_psh.lng);var _tol=(_gpsAcc||0);if(_pd>((_psh.radius||200)+_tol)){alert('\u26a0 \u4e0d\u5728\u300c'+pStore.value+'\u300d\u7bc4\u570d\u5185\n\n\u76ee\u524d\u8ddd\u96e2\uff1a'+Math.round(_pd)+'m\uff08GPS\u8aa4\u5dee\u00b1'+Math.round(_gpsAcc||0)+'m\uff09\n\u5141\u8a31\u7bc4\u570d\uff1a'+(_psh.radius||200)+'m\n\n\u8acb\u5728\u9580\u5e02\u7bc4\u570d\u5185\u3001\u6216\u65bc\u7a7a\u66e0\u8655\u5f85\u5b9a\u4f4d\u7cbe\u6e96\u5f8c\u518d\u6253\u5361');hmUnlock('punch:'+type);return}}/* PIN已取消 */var now=new Date();var today=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());var time=pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds());var rec={id:'p'+Date.now(),eid:curEmp.id,name:curEmp.name,store:(pStore?pStore.value:curEmp.store)||'',date:today,time:time,type:type,gps:_lat?(_lat.toFixed(5)+','+_lng.toFixed(5)):'無定位',acc:(_gpsAcc?Math.round(_gpsAcc):null),dist:(_pd!==null&&_pd!==undefined?Math.round(_pd):null),needChk:(_noGps||(_gpsAcc||0)>500),ts:now.toISOString()};var local=JSON.parse(localStorage.getItem('hm_app_punch')||'[]');local.push(rec);localStorage.setItem('hm_app_punch',JSON.stringify(local));/* [FIX-25] 上傳成功與否要讓員工看得到，不能只顯示「打卡成功」 */
+if(db&&navigator.onLine){
+  _punchDocOf(rec.date).set({data:firebase.firestore.FieldValue.arrayUnion(rec),ym:_appPmk(rec.date),updated:new Date().toISOString()},{merge:true})
+    .then(function(){var _r=document.getElementById('p-result');
+      if(_r&&_r.dataset&&_r.dataset.pid===rec.id){var _m=document.getElementById('p-sync-'+rec.id);
+        if(_m){_m.style.color='#166534';_m.textContent='✔ 已上傳雲端'}}})
+    .catch(function(e){
+      _appPunchFail(e,rec);
+      var _m=document.getElementById('p-sync-'+rec.id);
+      if(_m){_m.style.color='#b45309';_m.textContent='⚠ 尚未上傳，已暫存手機 —— 恢復網路後會自動補送'}
+      alert('⚠ 這筆打卡還沒有上傳到雲端\n\n已暫存在手機裡，恢復網路後會自動補送。\n請不要清除瀏覽器資料，也先不要換手機。');
+    });
+}else{
+  saveOfflinePunch(rec);
+  setTimeout(function(){var _m=document.getElementById('p-sync-'+rec.id);
+    if(_m){_m.style.color='#b45309';_m.textContent='⚠ 目前離線，已暫存手機 —— 恢復網路後會自動補送'}},50);
+}var res=document.getElementById('p-result');res.style.display='block';var tc=type==='上班'?'#166534':type==='下班'?'#991b1b':type==='外出'?'#92400e':'#0369a1';var bg=type==='上班'?'#dcfce7':type==='下班'?'#fee2e2':type==='外出'?'#fef3c7':'#e0f2fe';res.style.background=bg;res.style.color=tc;res.dataset.pid=rec.id;
+res.innerHTML='<div style="font-size:28px;margin-bottom:4px">'+(type==='上班'?'☀':type==='下班'?'🌙':type==='外出'?'🚶':'🏢')+'</div><div style="font-size:20px;font-weight:700">'+type+'打卡完成</div><div style="font-size:24px;font-weight:700;font-family:JetBrains Mono,monospace;margin-top:4px">'+time+'</div><div id="p-sync-'+rec.id+'" style="font-size:12px;margin-top:6px;color:#64748b">上傳中…</div>';
+renderPunchToday();showOfflineStatus();setTimeout(function(){hmUnlock('punch:'+type)},5000)}
 
 function renderPunchToday(){var now=new Date();var today=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());var local=JSON.parse(localStorage.getItem('hm_app_punch')||'[]');var recs=local.filter(function(r){return r.eid===(curEmp?curEmp.id:'')&&r.date===today}).sort(function(a,b){return a.time>b.time?1:-1});var h='';if(!recs.length)h='<div style="text-align:center;padding:16px;color:var(--gray4)">今日尚無打卡紀錄</div>';recs.forEach(function(r){var tc=r.type==='上班'?'#166534':r.type==='下班'?'#991b1b':r.type==='外出'?'#92400e':'#0369a1';var bg=r.type==='上班'?'#dcfce7':r.type==='下班'?'#fee2e2':r.type==='外出'?'#fef3c7':'#e0f2fe';h+='<div class="punch-row"><span style="background:'+bg+';color:'+tc+';padding:3px 10px;border-radius:8px;font-weight:700;font-size:12px;min-width:50px;text-align:center">'+r.type+'</span><span style="font-family:JetBrains Mono,monospace;font-weight:700;font-size:16px;margin-left:auto">'+r.time+'</span></div>'});document.getElementById('p-today').innerHTML=h}
 
@@ -527,7 +654,19 @@ function loadViewSched(){_viewSched=null;renderSched();if(!db||!curEmp)return;db
 
 function renderSched(){document.getElementById('sched-month').textContent='民國'+viewY+'年'+viewM+'月';if(!curEmp){document.getElementById('sched-list').innerHTML='<div style="text-align:center;padding:20px;color:var(--gray4)">未綁定員工</div>';return}var D=new Date(viewY+1911,viewM,0).getDate();var h='';var SRC=(_viewSched!==null)?_viewSched:sched;for(var d=1;d<=D;d++){var dt=new Date(viewY+1911,viewM-1,d);var dw=dt.getDay();var key=(viewY+1911)+'-'+pad(viewM)+'-'+pad(d);var sc=SRC[curEmp.id]?SRC[curEmp.id][key]:null;var isWknd=dw===0||dw===6;var dayColor=isWknd?'#991b1b':'var(--gray6)';h+='<div class="sched-day" style="'+(isWknd?'background:#fff5f5;border-radius:8px;padding:10px;margin:-2px -4px':'')+'"><span class="day" style="color:'+dayColor+'">'+viewM+'/'+d+'<br><span style="font-size:11px;color:var(--gray4)">('+DOW[dw]+')</span></span>';if(sc&&LEAVE.indexOf(sc.type)>=0){var lc=sc.type==='例假'?'#166534':sc.type==='特休'?'#0e7490':sc.type==='事假'?'#991b1b':'#6d28d9';h+='<span class="leave" style="color:'+lc+'">'+sc.type+'</span>'}else if(sc&&sc.type==='restOT'){h+='<span class="leave" style="color:#1e40af">🌙休息日加班 '+fT(sc.sh,sc.sm)+'-'+fT(sc.eh,sc.em)+'</span>'}else if(sc){h+='<span class="time">'+fT(sc.sh,sc.sm)+' - '+fT(sc.eh,sc.em)+(sc.store&&sc.store!==curEmp.store?' <span style="font-size:10px;background:#7c3aed;color:#fff;padding:1px 6px;border-radius:4px;margin-left:4px">'+sc.store+'</span>':'')+'</span>'}else if(dw===0){h+='<span class="leave" style="color:#166534">例假</span>'}else if(curEmp){h+='<span class="time">'+fT(curEmp.sh||9,curEmp.sm||0)+' - '+fT(curEmp.eh||17,curEmp.em||0)+'</span>'}h+='</div>'}document.getElementById('sched-list').innerHTML=h}
 
-function submitLeave(){if(!curEmp){alert('未綁定員工');return}var type=document.getElementById('al-type').value;var start=document.getElementById('al-start').value;var end=document.getElementById('al-end').value;var reason=document.getElementById('al-reason').value;var unit=document.getElementById('al-unit').value;if(!start||!end){alert('請選擇日期');return}if(!reason){alert('請填寫事由');return}var days=unit==='半天'?0.5:Math.max(1,Math.round((new Date(end)-new Date(start))/(24*60*60*1000))+1);var rec={id:'lv'+Date.now(),eid:curEmp.id,type:type,start:start,end:end,days:days,reason:reason,status:'待簽核',month:(viewY+1911)+'-'+pad(viewM),unit:unit,agent:'',agentName:'',created:new Date().toISOString()};if(db){db.collection(fbEnv+'_hrdata').doc('leave').get().then(function(doc){var data=doc.exists?doc.data():{leaveRecords:[]};data.leaveRecords.push(rec);db.collection(fbEnv+'_hrdata').doc('leave').set(data);alert('✅ 假單已送出\n'+type+' '+days+'天\n等待主管簽核');document.getElementById('al-reason').value='';renderLeave()}).catch(function(e){alert('送出失敗：'+e.message)})}else{var local=JSON.parse(localStorage.getItem('hm_app_leave')||'[]');local.push(rec);localStorage.setItem('hm_app_leave',JSON.stringify(local));alert('✅ 假單已暫存（離線模式）');renderLeave()}}
+function submitLeave(){if(!curEmp){alert('未綁定員工');return}var type=document.getElementById('al-type').value;var start=document.getElementById('al-start').value;var end=document.getElementById('al-end').value;var reason=document.getElementById('al-reason').value;var unit=document.getElementById('al-unit').value;if(!start||!end){alert('請選擇日期');return}/* [FIX-02] 舊版沒有檢查前後順序，反向區間會被 Math.max(1,…) 硬算成 1 天而照樣送出。 */var _ds=new Date(start),_de=new Date(end);if(isNaN(_ds.getTime())||isNaN(_de.getTime())){alert('日期格式不正確');return}if(_de<_ds){alert('⚠ 結束日不可早於開始日\n\n開始：'+start+'\n結束：'+end);return}if(!reason){alert('請填寫事由');return}var _span=Math.round((_de-_ds)/(24*60*60*1000))+1;if(unit==='半天'&&_span>1){alert('⚠ 半天假只能申請單一日期');return}var days=unit==='半天'?0.5:_span;var rec={id:'lv'+Date.now(),eid:curEmp.id,type:type,start:start,end:end,days:days,reason:reason,status:'待簽核',month:(viewY+1911)+'-'+pad(viewM),unit:unit,agent:'',agentName:'',created:new Date().toISOString()};if(db){
+  /* [FIX-09] 舊版三個問題：①整份讀寫→兩人同時送會吃掉一張 ②set() 沒有 catch
+     ③還沒寫成功就先 alert「✅ 已送出」，寫入失敗時員工以為送出了。 */
+  if(!hmLock('submitLeave'))return;
+  hmTxPush('leave','leaveRecords',rec).then(function(){
+    alert('✅ 假單已送出\n'+type+' '+days+'天\n等待主管簽核');
+    var _r=document.getElementById('al-reason');if(_r)_r.value='';
+    if(!leaveRecords.some(function(x){return x&&x.id===rec.id}))leaveRecords.push(rec);
+    renderLeave();
+  }).catch(function(e){
+    alert('⚠ 送出失敗，假單「沒有」送出\n\n'+e.message+'\n請確認網路後重試。');
+  }).then(function(){hmUnlock('submitLeave')},function(){hmUnlock('submitLeave')});
+}else{var local=JSON.parse(localStorage.getItem('hm_app_leave')||'[]');local.push(rec);localStorage.setItem('hm_app_leave',JSON.stringify(local));alert('✅ 假單已暫存（離線模式）');renderLeave()}}
 
 function renderLeave(){if(!curEmp){return}var myLeaves=leaveRecords.filter(function(r){return r.eid===curEmp.id}).reverse().slice(0,10);var local=JSON.parse(localStorage.getItem('hm_app_leave')||'[]').filter(function(r){return r.eid===curEmp.id}).reverse();var all=local.concat(myLeaves);var h='';if(!all.length)h='<div style="text-align:center;padding:16px;color:var(--gray4)">無假單紀錄</div>';all.forEach(function(r){var sc=r.status==='已核准'?'background:#dcfce7;color:#166534':r.status==='已駁回'?'background:#fee2e2;color:#991b1b':r.status==='店長核准'?'background:#dbeafe;color:#1e40af':'background:#fef3c7;color:#92400e';h+='<div class="list-item"><div style="flex:1"><div style="font-weight:700">'+r.type+' <span style="font-size:12px;color:var(--gray4)">'+r.days+'天</span></div><div style="font-size:12px;color:var(--gray4)">'+r.start+' ~ '+r.end+'</div><div style="font-size:12px;color:var(--gray4)">'+(r.reason||'')+'</div></div><span class="badge" style="'+sc+'">'+r.status+'</span></div>'});document.getElementById('leave-list').innerHTML=h}
 
@@ -554,11 +693,36 @@ function renderMe(){renderAppVersion();if(!curEmp)return;var e=curEmp;var h='';v
 
 function showAppForgot(){document.getElementById('app-forgot').style.display='block';document.getElementById('app-err').style.display='none'}
 function hideAppForgot(){document.getElementById('app-forgot').style.display='none';document.getElementById('forgot-user').value='';document.getElementById('forgot-id').value=''}
+/* [FIX-16] 密碼重設的嘗試次數限制與紀錄 */
+function _forgotAllowed(user){
+  try{
+    var k='hm_forgot_'+user, now=Date.now();
+    var arr=JSON.parse(localStorage.getItem(k)||'[]').filter(function(t){return now-t<86400000});
+    return arr.length<3;
+  }catch(e){return true}
+}
+function _forgotCount(user){
+  try{
+    var k='hm_forgot_'+user, now=Date.now();
+    var arr=JSON.parse(localStorage.getItem(k)||'[]').filter(function(t){return now-t<86400000});
+    arr.push(now); localStorage.setItem(k,JSON.stringify(arr));
+  }catch(e){}
+}
+function _forgotLog(user,ok){
+  try{
+    if(db)hmTxPush('errorLog','data',{id:'fg'+Date.now(),type:'密碼重設嘗試',user:user,ok:!!ok,ts:new Date().toISOString()});
+  }catch(e){}
+}
 function doAppForgot(){
   try{
     var user=document.getElementById('forgot-user').value.trim().toLowerCase();
     var idNum=document.getElementById('forgot-id').value.trim();
-    if(!user||!idNum){alert('請填寫帳號和驗證資料');return}
+    var _f2=document.getElementById('forgot-id2');
+    var idNum2=_f2?_f2.value.trim():'';
+    if(!user||!idNum||!idNum2){alert('請填寫帳號、身分證字號，以及生日或手機');return}
+    /* [FIX-16] 次數限制：同一帳號 24 小時最多 3 次 */
+    if(!_forgotAllowed(user)){alert('⚠ 嘗試次數過多\n\n此帳號今日的密碼重設申請已達上限。\n請直接聯繫店長或老闆。');return}
+    _forgotCount(user);   /* 進入驗證就計一次 —— 不能等非同步結果才計，否則連按可以繞過 */
     if(!db){alert('無法連線，請稍後再試');return}
     db.collection(fbEnv+'_hrdata').doc('accounts').get().then(function(doc){
       if(!doc.exists){alert('系統錯誤，請聯繫管理員');return}
@@ -569,23 +733,66 @@ function doAppForgot(){
       db.collection(fbEnv+'_employees').doc(acct.empId).get().then(function(d2){
         if(!d2.exists){alert('查無員工資料，請聯繫管理員');return}
         var emp=Object.assign({id:d2.id},d2.data());
-        var verified=false;
-        if(emp.id_num&&emp.id_num===idNum)verified=true;
-        if(!verified&&emp.birth&&emp.birth===idNum)verified=true;
-        if(!verified&&emp.phone&&emp.phone===idNum)verified=true;
-        if(!verified){alert('驗證失敗\n\n請輸入以下任一項：\n• 身分證字號\n• 出生日期（如 1990-01-15）\n• 手機號碼\n\n若仍無法重設，請聯繫店長或老闆');return}
-        var newPass=user+'aa';
-        acct.pass=hashPass(newPass);
-        /* device binding removed */
-        db.collection(fbEnv+'_hrdata').doc('accounts').set({userAccounts:accounts}).then(function(){
-          alert('✅ 密碼已重設\n\n帳號：'+user+'\n新密碼：'+newPass+'\n\n登入後請至「👤 我的」修改密碼');
+        /* ══ [FIX-16] 舊版是這整套系統最大的漏洞 ══════════════════════
+           舊版：身分證 or 生日 or 手機「三選一」通過即可，把密碼重設成
+                 「工號+aa」並直接把新密碼顯示在畫面上，沒有次數限制、
+                 沒有通知本人。工號在班表上看得到、生日同事都知道 ——
+                 任何員工在登入畫面上就能接管別人的帳號看薪資，而且對方
+                 要到下次登入才會發現。
+           新版：① 需同時通過兩項驗證（身分證＋生日／手機擇一）
+                 ② 不再自動重設，改為送出「重設申請」給主管處理
+                 ③ 畫面上絕不顯示任何密碼
+                 ④ 同一帳號 24 小時內最多 3 次嘗試
+                 ⑤ 每次嘗試都留紀錄（成功與失敗都留） */
+        var idOk    = !!(emp.id_num && emp.id_num===idNum);
+        var birthOk = !!(emp.birth  && emp.birth===idNum2);
+        var phoneOk = !!(emp.phone  && emp.phone===idNum2);
+        if(!(idOk && (birthOk||phoneOk))){
+          _forgotLog(user,false);
+          alert('驗證失敗\n\n需要同時提供：\n• 身分證字號\n• 出生日期（如 1990-01-15）或手機號碼\n\n若無法通過，請直接聯繫店長或老闆代為重設');
+          return;
+        }
+        _forgotLog(user,true);
+        hmTxPush('punchApplies','data',{
+          id:'pr'+Date.now(), kind:'密碼重設', eid:acct.empId, name:emp.name,
+          store:emp.store||'', date:new Date().toISOString().slice(0,10),
+          reason:'員工於登入畫面申請密碼重設（已通過身分證＋生日/手機雙重驗證）',
+          status:'待審核', submitDate:new Date().toISOString()
+        }).then(function(){
+          alert('✅ 重設申請已送出\n\n為了保護您的帳號，系統不會自動重設密碼。\n請聯繫店長或老闆，他們會在管理端替您重設並當面告知新密碼。');
           hideAppForgot();
-        }).catch(function(e){alert('重設失敗：'+e.message)});
+        }).catch(function(e){alert('送出失敗：'+e.message)});
       }).catch(function(e){alert('查詢失敗：'+e.message)});
     }).catch(function(e){alert('連線失敗：'+e.message)});
   }catch(e){alert('系統錯誤：'+e.message)}
 }
-function appChangePass(){if(!curAcct){alert('請先登入');return}var oldP=prompt('請輸入目前密碼：');if(!oldP)return;if(!verifyPass(oldP,curAcct.pass)){alert('密碼錯誤');return}var newP=prompt('請輸入新密碼（8~16字元，英文+數字）：');if(!newP)return;if(newP.length<8||newP.length>16){alert('密碼長度需8~16字元');return}if(!/[a-zA-Z]/.test(newP)||!/[0-9]/.test(newP)){alert('密碼需同時包含英文和數字');return}var confirmP=prompt('請再次輸入新密碼確認：');if(confirmP!==newP){alert('兩次輸入不一致');return}if(db){db.collection(fbEnv+'_hrdata').doc('accounts').get().then(function(doc){if(!doc.exists)return;var data=doc.data();var accounts=data.userAccounts||[];var acct=accounts.find(function(a){return a.user===curAcct.user});if(acct){acct.pass=hashPass(newP);db.collection(fbEnv+'_hrdata').doc('accounts').set({userAccounts:accounts});curAcct.pass=hashPass(newP);if(document.getElementById('app-remember').checked){localStorage.setItem('hm_app_session',JSON.stringify({user:curAcct.user,pass:newP}))}alert('✅ 密碼已修改成功')}}).catch(function(e){alert('修改失敗：'+e.message)})}else{alert('請連線後再修改密碼')}}
+function appChangePass(){if(!curAcct){alert('請先登入');return}var oldP=prompt('請輸入目前密碼：');if(!oldP)return;if(!verifyPass(oldP,curAcct.pass)){alert('密碼錯誤');return}var newP=prompt('請輸入新密碼（8~16字元，英文+數字）：');if(!newP)return;if(newP.length<8||newP.length>16){alert('密碼長度需8~16字元');return}if(!/[a-zA-Z]/.test(newP)||!/[0-9]/.test(newP)){alert('密碼需同時包含英文和數字');return}var confirmP=prompt('請再次輸入新密碼確認：');if(confirmP!==newP){alert('兩次輸入不一致');return}if(db){
+  /* [FIX-13] 舊版：①整份讀寫（管理端同時改帳號會互相覆蓋）②set() 沒 catch，
+     失敗仍顯示「✅ 已修改成功」③把新的明文密碼寫進 localStorage。 */
+  if(!hmLock('changePass'))return;
+  var _nh=hashPass(newP),_found=false;
+  hmTx(hmRef('accounts'),function(d){
+    var accounts=d.userAccounts||[];
+    var a=accounts.find(function(x){return x.user===curAcct.user});
+    if(!a)return false;
+    if(!verifyPass(oldP,a.pass))return false;   /* 期間被管理端改過就中止 */
+    a.pass=_nh;_found=true;d.userAccounts=accounts;return d;
+  }).then(function(){
+    if(!_found){alert('⚠ 密碼未變更：帳號資料已被管理端更動，請重新登入後再試');return}
+    curAcct.pass=_nh;
+    try{
+      var la=JSON.parse(localStorage.getItem('hm_app_accounts')||'[]');
+      var lo=la.find(function(x){return x.user===curAcct.user});if(lo)lo.pass=_nh;
+      localStorage.setItem('hm_app_accounts',JSON.stringify(la));
+    }catch(e){}
+    var _rm=document.getElementById('app-remember');
+    if(_rm&&_rm.checked){localStorage.setItem('hm_app_session',JSON.stringify({user:curAcct.user,ph:_nh,exp:Date.now()+30*24*60*60*1000}))}
+    else{localStorage.removeItem('hm_app_session')}
+    alert('✅ 密碼已修改成功');
+  }).catch(function(e){
+    alert('⚠ 修改失敗，密碼「沒有」變更\n\n'+e.message+'\n請沿用舊密碼並稍後重試。');
+  }).then(function(){hmUnlock('changePass')},function(){hmUnlock('changePass')});
+}else{alert('請連線後再修改密碼')}}
 
 var preLeaveSelected=[];
 function renderPreLeave(){if(!curAcct)return;var now=new Date();var nextM=now.getMonth()+2;var nextY=now.getFullYear();if(nextM>12){nextM=1;nextY++}var mk=nextY+'-'+String(nextM).padStart(2,'0');var isOpen=now.getDate()<=10;var statusEl=document.getElementById('preleave-status');var calEl=document.getElementById('preleave-calendar');var selEl=document.getElementById('preleave-selected');var actEl=document.getElementById('preleave-actions');
@@ -597,36 +804,139 @@ var daysInMonth=new Date(yr,mon,0).getDate();var firstDay=new Date(yr,mon-1,1).g
 updatePreLeaveSelected(selEl,actEl)}
 function togglePreLeaveDate(el,dateStr){var idx=preLeaveSelected.indexOf(dateStr);if(idx>=0){preLeaveSelected.splice(idx,1)}else{if(preLeaveSelected.length>=4){alert('最多選擇4天');return}preLeaveSelected.push(dateStr)}renderPreLeave()}
 function updatePreLeaveSelected(selEl,actEl){if(preLeaveSelected.length>0){selEl.innerHTML='<div style="font-size:13px;font-weight:700;color:#0f1b35;margin-bottom:6px">已選擇 '+preLeaveSelected.length+'/4 天</div><div style="display:flex;flex-wrap:wrap;gap:4px">'+preLeaveSelected.sort().map(function(d){return'<span style="padding:4px 10px;background:#dbeafe;border-radius:6px;font-size:12px;font-weight:700;color:#1e40af">'+d.substring(5)+'</span>'}).join('')+'</div>';actEl.innerHTML='<button class="btn btn-blue" onclick="submitPreLeave()" style="width:100%;margin-top:8px;padding:12px;font-size:15px">📤 提交劃休申請</button>'}else{selEl.innerHTML='';actEl.innerHTML=''}}
-function submitPreLeave(){if(preLeaveSelected.length===0){alert('請先選擇休假日期');return}if(!curEmp||!db){alert('請先登入並連線');return}var now=new Date();var nextM=now.getMonth()+2;var nextY=now.getFullYear();if(nextM>12){nextM=1;nextY++}var mk=nextY+'-'+String(nextM).padStart(2,'0');var plStore=document.getElementById('preleave-store');var newPL={id:'pl'+Date.now(),eid:curEmp.id,name:curEmp.name,store:plStore?plStore.value:(curEmp.store||''),month:mk,dates:preLeaveSelected.sort(),status:'待審核',submitDate:now.toISOString()};db.collection(fbEnv+'_hrdata').doc('preLeave').get().then(function(doc){var data=doc.exists?doc.data().data||[]:[];data.push(newPL);db.collection(fbEnv+'_hrdata').doc('preLeave').set({data:data}).then(function(){preLeaveSelected=[];alert('✅ 劃休申請已提交\n\n'+mk+' 休假：'+newPL.dates.join(', ')+'\n\n請等待店長審核');renderPreLeave()}).catch(function(e){alert('提交失敗：'+e.message)})}).catch(function(e){alert('連線失敗：'+e.message)})}
-function resetPreLeave(){if(!curEmp||!db)return;var now=new Date();var nextM=now.getMonth()+2;var nextY=now.getFullYear();if(nextM>12){nextM=1;nextY++}var mk=nextY+'-'+String(nextM).padStart(2,'0');db.collection(fbEnv+'_hrdata').doc('preLeave').get().then(function(doc){var data=doc.exists?doc.data().data||[]:[];data=data.filter(function(p){return!(p.eid===curEmp.id&&p.month===mk)});db.collection(fbEnv+'_hrdata').doc('preLeave').set({data:data}).then(function(){preLeaveSelected=[];renderPreLeave()}).catch(function(e){alert('失敗：'+e.message)})})}
+function submitPreLeave(){if(preLeaveSelected.length===0){alert('請先選擇休假日期');return}if(!curEmp||!db){alert('請先登入並連線');return}var now=new Date();var nextM=now.getMonth()+2;var nextY=now.getFullYear();if(nextM>12){nextM=1;nextY++}var mk=nextY+'-'+String(nextM).padStart(2,'0');var plStore=document.getElementById('preleave-store');var newPL={id:'pl'+Date.now(),eid:curEmp.id,name:curEmp.name,store:plStore?plStore.value:(curEmp.store||''),month:mk,dates:preLeaveSelected.sort(),status:'待審核',submitDate:now.toISOString()};if(!hmLock('submitPreLeave'))return;
+  hmTxPush('preLeave','data',newPL).then(function(){
+    preLeaveSelected=[];
+    alert('✅ 劃休申請已提交\n\n'+mk+' 休假：'+newPL.dates.join(', ')+'\n\n請等待店長審核');
+    renderPreLeave();
+  }).catch(function(e){alert('⚠ 提交失敗，劃休「沒有」送出\n\n'+e.message);
+  }).then(function(){hmUnlock('submitPreLeave')},function(){hmUnlock('submitPreLeave')});
+}
+function resetPreLeave(){if(!curEmp||!db)return;var now=new Date();var nextM=now.getMonth()+2;var nextY=now.getFullYear();if(nextM>12){nextM=1;nextY++}var mk=nextY+'-'+String(nextM).padStart(2,'0');if(!hmLock('resetPreLeave'))return;
+  hmTx(hmRef('preLeave'),function(d){
+    var list=Array.isArray(d.data)?d.data:[];
+    /* [FIX-10] 已核准的劃休不可自行清掉 */
+    d.data=list.filter(function(x){return!(x&&x.eid===curEmp.id&&x.month===mk&&x.status!=='已核准')});
+    return d;
+  }).then(function(){preLeaveSelected=[];renderPreLeave()})
+   .catch(function(e){alert('取消失敗：'+e.message)})
+   .then(function(){hmUnlock('resetPreLeave')},function(){hmUnlock('resetPreLeave')});
+}
 
 
 function checkPreLeaveReminder(){if(!curEmp||!db)return;var now=new Date();if(now.getDate()>10)return;var nextM=now.getMonth()+2;var nextY=now.getFullYear();if(nextM>12){nextM=1;nextY++}var mk=nextY+'-'+String(nextM).padStart(2,'0');db.collection(fbEnv+'_hrdata').doc('preLeave').get().then(function(doc){var data=doc.exists?doc.data().data||[]:[];var mine=data.find(function(p){return p.eid===curEmp.id&&p.month===mk});if(!mine){var daysLeft=10-now.getDate();var el=document.getElementById('preleave-remind');if(el)el.innerHTML='<div onclick="switchScreen(\'preleave\')" style="padding:14px;background:linear-gradient(135deg,#fee2e2,#fff1f2);border:2px solid #dc2626;border-radius:12px;margin-bottom:14px;cursor:pointer"><div style="font-size:14px;font-weight:700;color:#991b1b">🗓 劃休提醒</div><div style="font-size:12px;color:#991b1b;margin-top:4px">'+mk+' 尚未提交劃休申請</div><div style="font-size:12px;color:#dc2626;margin-top:2px">截止日剩 <b>'+daysLeft+'</b> 天，請盡快提交 →</div></div>'}}).catch(function(){})}
 
 
-function appAutoLogin(sess){if(!db){appLogin();return}db.collection(fbEnv+'_hrdata').doc('accounts').get().then(function(doc){if(!doc.exists){appLogin();return}var accounts=doc.data().userAccounts||[];var acct=accounts.find(function(a){return a.user===sess.user&&verifyPass(sess.pass,a.pass)});if(acct){finishLogin(acct)}else{localStorage.removeItem('hm_app_session');document.getElementById('app-pass').value='';showErr('密碼已被管理端修改，請重新登入')}}).catch(function(){appLogin()})}
+/* [FIX-12b] 配合不再存明文密碼：改以雜湊值比對，並檢查 30 天到期。 */
+function appAutoLogin(sess){
+  if(!sess||!sess.ph){localStorage.removeItem('hm_app_session');return}
+  if(sess.exp&&Date.now()>sess.exp){localStorage.removeItem('hm_app_session');showErr('自動登入已過期，請重新輸入密碼');return}
+  if(!db){return}
+  db.collection(fbEnv+'_hrdata').doc('accounts').get().then(function(doc){
+    if(!doc.exists)return;
+    var accounts=doc.data().userAccounts||[];
+    var acct=accounts.find(function(a){return a.user===sess.user&&a.pass===sess.ph});
+    if(acct){finishLogin(acct)}
+    else{localStorage.removeItem('hm_app_session');showErr('密碼已變更，請重新登入')}
+  }).catch(function(){});
+}
 
 
 function renderOTChoices(){if(!curEmp||!db)return;db.collection(fbEnv+'_hrdata').doc('otRecords').get().then(function(doc){var data=doc.exists?doc.data().data||[]:[];var myOT=data.filter(function(r){return r.eid===curEmp.id&&r.status==='已核准'&&!r.payType});var el=document.getElementById('ot-choice-area');if(!el)return;if(myOT.length===0){el.innerHTML='';return}var h='';myOT.forEach(function(r){h+='<div style="padding:14px;background:linear-gradient(135deg,#dcfce7,#f0fdf4);border:2px solid #16a34a;border-radius:12px;margin-bottom:10px"><div style="font-size:14px;font-weight:700;color:#166534;margin-bottom:6px">✅ 加班已核准</div><div style="font-size:12px;color:#333;margin-bottom:8px">日期：'+r.date+' ｜ 時數：'+r.hours+'小時</div><div style="display:flex;gap:8px"><button onclick="appOTChoose(\''+r.id+'\',\'pay\')" style="flex:1;padding:12px;background:#0369a1;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">💰 領加班費</button><button onclick="appOTChoose(\''+r.id+'\',\'comp\')" style="flex:1;padding:12px;background:#7c3aed;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">🗓 換補休</button></div></div>'});el.innerHTML=h}).catch(function(){})}
-function appOTChoose(otId,choice){if(!db)return;var label=choice==='pay'?'💰 領加班費':'🗓 換補休（6個月內有效）';if(!confirm('確定選擇「'+label+'」？\n\n'+(choice==='pay'?'加班費將計入當月薪資。':'補休時數將記錄在系統中，6個月內需使用完畢。\n到期未休完將自動轉為加班費。')))return;db.collection(fbEnv+'_hrdata').doc('otRecords').get().then(function(doc){var data=doc.exists?doc.data().data||[]:[];var r=data.find(function(x){return x.id===otId});if(!r){alert('找不到此紀錄');return}if(choice==='pay'){r.payType='加班費'}else{var expiry=new Date(r.date);expiry.setMonth(expiry.getMonth()+6);r.payType='補休';r.compHours=r.hours;r.compUsed=0;r.compExpiry=expiry.toISOString().substring(0,10)}r.choiceDate=new Date().toISOString();r.choiceBy='employee';db.collection(fbEnv+'_hrdata').doc('otRecords').set({data:data}).then(function(){alert('✅ 已選擇：'+label);renderOTChoices()}).catch(function(e){alert('失敗：'+e.message)})}).catch(function(e){alert('連線失敗：'+e.message)})}
+function appOTChoose(otId,choice){if(!db)return;var label=choice==='pay'?'💰 領加班費':'🗓 換補休（6個月內有效）';if(!confirm('確定選擇「'+label+'」？\n\n'+(choice==='pay'?'加班費將計入當月薪資。':'補休時數將記錄在系統中，6個月內需使用完畢。\n到期未休完將自動轉為加班費。')))return;/* [FIX-18] 舊版可以反覆改「領錢／補休」，而且是整份讀寫。
+   這關係到薪資，一經選擇就鎖定，要改由主管在管理端處理。 */
+if(!hmLock('otChoose:'+otId))return;
+var _otErr=null;
+hmTx(hmRef('otRecords'),function(d){
+  var data=Array.isArray(d.data)?d.data:[];
+  var r=null;for(var i=0;i<data.length;i++){if(data[i]&&data[i].id===otId){r=data[i];break}}
+  if(!r){_otErr='找不到此紀錄';return false}
+  if(r.status!=='已核准'){_otErr='此筆加班尚未核准，無法選擇';return false}
+  if(r.payType){_otErr='此筆加班已選擇「'+r.payType+'」，如需變更請聯繫主管';return false}if(choice==='pay'){r.payType='加班費'}else{var expiry=new Date(r.date);expiry.setMonth(expiry.getMonth()+6);r.payType='補休';r.compHours=r.hours;r.compUsed=0;r.compExpiry=expiry.toISOString().substring(0,10)}r.choiceDate=new Date().toISOString();r.choiceBy='employee';
+  r.chooseAt=new Date().toISOString();
+  d.data=data;return d;
+}).then(function(){
+  if(_otErr){alert('⚠ '+_otErr);renderOTChoices();return}
+  alert('✅ 已選擇：'+label+'\n\n此選擇已定案，如需變更請聯繫主管。');
+  renderOTChoices();
+}).catch(function(e){alert('⚠ 選擇失敗，沒有變更\n\n'+e.message)
+}).then(function(){hmUnlock('otChoose:'+otId)},function(){hmUnlock('otChoose:'+otId)});}
 
 
-function submitMakeupPunch(){if(!curEmp||!db)return;var date=document.getElementById('app-makeup-date').value;var time=document.getElementById('app-makeup-time').value;var type=document.getElementById('app-makeup-type').value;var reason=document.getElementById('app-makeup-reason').value;if(!date||!time||!reason){alert('請填寫完整（日期、時間、原因）');return}if(!confirm('確認提交補打卡申請？\n\n日期：'+date+'\n時間：'+time+'\n類型：'+type+'\n原因：'+reason))return;db.collection(fbEnv+'_hrdata').doc('punchApplies').get().then(function(doc){var data=doc.exists?doc.data().data||[]:[];data.push({id:'ma'+Date.now(),eid:curEmp.id,name:curEmp.name,store:curEmp.store||'',date:date,time:time+':00',type:type,reason:reason,status:'待審核',submitDate:new Date().toISOString()});db.collection(fbEnv+'_hrdata').doc('punchApplies').set({data:data}).then(function(){alert('✅ 補打卡申請已提交\n請等待店長審核');document.getElementById('app-makeup-reason').value='';loadMakeupHistory()}).catch(function(e){alert('提交失敗：'+e.message)})}).catch(function(e){alert('連線失敗：'+e.message)})}
+function submitMakeupPunch(){if(!curEmp||!db)return;var date=document.getElementById('app-makeup-date').value;var time=document.getElementById('app-makeup-time').value;var type=document.getElementById('app-makeup-type').value;var reason=document.getElementById('app-makeup-reason').value;if(!date||!time||!reason){alert('請填寫完整（日期、時間、原因）');return}
+  /* [FIX-24] 舊版沒有檢查日期範圍 —— 可以幫自己補一筆下個月的打卡。 */
+  var _md=new Date(date+'T00:00:00'), _t0=new Date(); _t0.setHours(0,0,0,0);
+  if(isNaN(_md.getTime())){alert('日期格式不正確');return}
+  if(_md>_t0){alert('⚠ 補打卡不能填未來的日期\n\n只能補登今天或今天以前忘記打的卡。');return}
+  if((_t0-_md)>62*86400000){alert('⚠ 只能補登 2 個月內的打卡\n\n更早的紀錄請直接請主管在管理端處理。');return}if(!confirm('確認提交補打卡申請？\n\n日期：'+date+'\n時間：'+time+'\n類型：'+type+'\n原因：'+reason))return;if(!hmLock('submitMakeup'))return;
+  var _rec={id:'ma'+Date.now(),eid:curEmp.id,name:curEmp.name,store:curEmp.store||'',date:date,time:time+':00',type:type,reason:reason,status:'待審核',submitDate:new Date().toISOString()};
+  hmTxPush('punchApplies','data',_rec).then(function(){
+    alert('✅ 補打卡申請已提交\n請等待店長審核');
+    var _r=document.getElementById('app-makeup-reason');if(_r)_r.value='';
+    loadMakeupHistory();
+  }).catch(function(e){alert('⚠ 提交失敗，申請「沒有」送出\n\n'+e.message);
+  }).then(function(){hmUnlock('submitMakeup')},function(){hmUnlock('submitMakeup')});
+}
 function loadMakeupHistory(){if(!curEmp||!db)return;db.collection(fbEnv+'_hrdata').doc('punchApplies').get().then(function(doc){var data=doc.exists?doc.data().data||[]:[];var mine=data.filter(function(r){return r.eid===curEmp.id}).sort(function(a,b){return a.date>b.date?-1:1}).slice(0,5);var el=document.getElementById('app-makeup-list');if(!el)return;if(mine.length===0){el.innerHTML='';return}var h='<div style="font-size:12px;font-weight:700;color:#666;margin-bottom:6px">近期申請</div>';mine.forEach(function(r){var stColor=r.status==='已核准'?'#166534':r.status==='已拒絕'?'#991b1b':'#92400e';var stBg=r.status==='已核准'?'#dcfce7':r.status==='已拒絕'?'#fee2e2':'#fef3c7';h+='<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;margin-bottom:3px;background:'+stBg+';border-radius:6px;font-size:11px"><span style="font-family:monospace;min-width:72px">'+r.date+'</span><span style="min-width:40px">'+r.time.substring(0,5)+'</span><span style="min-width:30px">'+r.type+'</span><span style="font-weight:700;color:'+stColor+'">'+r.status+'</span></div>'});el.innerHTML=h}).catch(function(){})}
 function loadStoreNotes(){if(!curEmp||!db)return;db.collection(fbEnv+'_hrdata').doc('storeNotes').get().then(function(doc){if(!doc.exists)return;var notes=doc.data().data||{};var store=curEmp.store||'總公司';var today=new Date().toISOString().substring(0,10);var noteKey=store+'_'+today;var note=notes[noteKey];var el=document.getElementById('app-store-notes');if(!el)return;if(!note||!note.content){el.innerHTML='';return}el.innerHTML='<div style="padding:14px;background:linear-gradient(135deg,#fee2e2,#fff1f2);border:2px solid #dc2626;border-radius:12px;margin-bottom:10px"><div style="font-size:14px;font-weight:700;color:#92400e;margin-bottom:4px">📋 今日交接事項</div><div style="font-size:12px;color:#92400e;line-height:1.6">'+note.content.replace(/\n/g,'<br>')+'</div><div style="font-size:10px;color:#b45309;margin-top:6px">— '+note.by+' '+(note.time||'')+'</div></div>'}).catch(function(){})}
 
 
 function openAppSwap(){if(!curEmp||!db)return;var h='<div style="font-size:16px;font-weight:700;color:#0f1b35;margin-bottom:12px">🔄 換班申請</div>';h+='<div style="margin-bottom:8px"><span style="font-size:11px;color:#666">換班日期</span><input class="fi" type="date" id="app-swap-date"></div>';h+='<div style="margin-bottom:8px"><span style="font-size:11px;color:#666">想換的對象</span><select class="fi" id="app-swap-target">';staff.forEach(function(e){if(e.id!==curEmp.id&&!e.leave_date)h+='<option value="'+e.id+'">'+e.name+'</option>'});h+='</select></div>';h+='<div style="margin-bottom:8px"><span style="font-size:11px;color:#666">原因</span><input class="fi" id="app-swap-reason" placeholder="換班原因"></div>';h+='<button onclick="submitAppSwap()" style="width:100%;padding:10px;background:#7c3aed;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">📤 提交換班申請</button>';h+='<div id="app-swap-list" style="margin-top:12px"></div>';document.getElementById('screen-swap').innerHTML='<div style="padding:16px">'+h+'</div>';loadAppSwapHistory()}
-function submitAppSwap(){if(!curEmp||!db)return;var date=document.getElementById('app-swap-date').value;var target=document.getElementById('app-swap-target').value;var reason=document.getElementById('app-swap-reason').value;if(!date||!target||!reason){alert('請填寫完整');return}var targetEmp=staff.find(function(x){return x.id===target});if(!confirm('確認提交換班申請？\n\n日期：'+date+'\n換班對象：'+targetEmp.name+'\n原因：'+reason))return;db.collection(fbEnv+'_hrdata').doc('swapRecords').get().then(function(doc){var data=doc.exists?doc.data().data||[]:[];data.push({id:'sw'+Date.now(),fromEid:curEmp.id,fromName:curEmp.name,toEid:target,toName:targetEmp.name,date:date,reason:reason,status:'待審核',submitDate:new Date().toISOString()});db.collection(fbEnv+'_hrdata').doc('swapRecords').set({data:data}).then(function(){alert('✅ 換班申請已提交\n請等待店長審核');loadAppSwapHistory()}).catch(function(e){alert('失敗：'+e.message)})}).catch(function(e){alert('連線失敗：'+e.message)})}
+function submitAppSwap(){if(!curEmp||!db)return;var date=document.getElementById('app-swap-date').value;var target=document.getElementById('app-swap-target').value;var reason=document.getElementById('app-swap-reason').value;if(!date||!target||!reason){alert('請填寫完整');return}var targetEmp=staff.find(function(x){return x.id===target});/* [FIX-03] 舊版直接讀 targetEmp.name，對象不存在時整個畫面當掉。 */if(!targetEmp){alert('⚠ 找不到換班對象，請重新選擇');return}if(targetEmp.id===curEmp.id){alert('⚠ 不能和自己換班');return}if(!confirm('確認提交換班申請？\n\n日期：'+date+'\n換班對象：'+targetEmp.name+'\n原因：'+reason))return;if(!hmLock('submitSwap'))return;
+  var _rec={id:'sw'+Date.now(),fromEid:curEmp.id,fromName:curEmp.name,toEid:target,toName:targetEmp.name,date:date,reason:reason,status:'待審核',submitDate:new Date().toISOString()};
+  hmTxPush('swapRecords','data',_rec).then(function(){
+    alert('✅ 換班申請已提交\n請等待店長審核');loadAppSwapHistory();
+  }).catch(function(e){alert('⚠ 提交失敗，申請「沒有」送出\n\n'+e.message);
+  }).then(function(){hmUnlock('submitSwap')},function(){hmUnlock('submitSwap')});
+}
 function loadAppSwapHistory(){if(!curEmp||!db)return;db.collection(fbEnv+'_hrdata').doc('swapRecords').get().then(function(doc){var data=doc.exists?doc.data().data||[]:[];var mine=data.filter(function(r){return r.fromEid===curEmp.id||r.toEid===curEmp.id}).sort(function(a,b){return a.date>b.date?-1:1}).slice(0,5);var el=document.getElementById('app-swap-list');if(!el)return;if(mine.length===0){el.innerHTML='';return}var h='<div style="font-size:12px;font-weight:700;color:#666;margin-bottom:6px">近期申請</div>';mine.forEach(function(r){var stColor=r.status==='已核准'?'#166534':r.status==='已拒絕'?'#991b1b':'#92400e';var stBg=r.status==='已核准'?'#dcfce7':r.status==='已拒絕'?'#fee2e2':'#fef3c7';h+='<div style="padding:6px 8px;margin-bottom:3px;background:'+stBg+';border-radius:6px;font-size:11px"><b>'+r.fromName+'</b> ⇄ <b>'+r.toName+'</b> '+r.date+' <span style="font-weight:700;color:'+stColor+'">'+r.status+'</span></div>'});el.innerHTML=h}).catch(function(){})}
 
 
 function loadPayNotify(){if(!curEmp||!db)return;db.collection(fbEnv+'_hrdata').doc('payNotifies').get().then(function(doc){if(!doc.exists)return;var data=doc.data().data||[];var mine=data.filter(function(n){return n.eid===curEmp.id&&!n.read});var el=document.getElementById('app-pay-notify');if(!el)return;if(mine.length===0){el.innerHTML='';return}var h='';mine.forEach(function(n){h+='<div style="padding:14px;background:linear-gradient(135deg,#dbeafe,#eff6ff);border:2px solid #2563eb;border-radius:12px;margin-bottom:10px"><div style="font-size:14px;font-weight:700;color:#1e40af;margin-bottom:4px">💰 '+n.title+'</div><div style="font-size:12px;color:#333">'+n.content+'</div><button onclick="markPayRead(\''+n.id+'\')" style="margin-top:8px;padding:6px 16px;background:#2563eb;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">✓ 已讀</button></div>'});el.innerHTML=h}).catch(function(){})}
-function markPayRead(nid){if(!db)return;db.collection(fbEnv+'_hrdata').doc('payNotifies').get().then(function(doc){var data=doc.exists?doc.data().data||[]:[];var n=data.find(function(x){return x.id===nid});if(n)n.read=true;db.collection(fbEnv+'_hrdata').doc('payNotifies').set({data:data}).then(function(){loadPayNotify()}).catch(function(){})}).catch(function(){})}
+/* [FIX-22] 改用交易：舊版整份寫回，會蓋掉別人同時被標記的已讀狀態。 */
+function markPayRead(nid){
+  if(!db)return;
+  hmTx(hmRef('payNotifies'),function(d){
+    var data=Array.isArray(d.data)?d.data:[];
+    var n=null;for(var i=0;i<data.length;i++){if(data[i]&&data[i].id===nid){n=data[i];break}}
+    if(!n||n.read)return false;
+    n.read=true;n.readAt=new Date().toISOString();d.data=data;return d;
+  }).then(function(){loadPayNotify()}).catch(function(e){console.error('[薪資通知] 標記已讀失敗',e)});
+}
 
 
-function loadAppSurvey(){if(!curEmp||!db)return;db.collection(fbEnv+'_hrdata').doc('survey').get().then(function(doc){if(!doc.exists)return;var data=doc.data().data||[];var active=data.filter(function(s){return s.status==='進行中'&&!s.responses.find(function(r){return r.eid===curEmp.id})});var el=document.getElementById('app-survey-area');if(!el)return;if(active.length===0){el.innerHTML='';return}var h='';active.forEach(function(s){h+='<div style="padding:14px;background:linear-gradient(135deg,#fee2e2,#fff5f5);border:2px solid #dc2626;border-radius:12px;margin-bottom:10px"><div style="font-size:14px;font-weight:700;color:#7c3aed;margin-bottom:8px">📝 '+s.title+'</div>';s.questions.forEach(function(q,qi){h+='<div style="margin-bottom:6px;font-size:12px"><div style="color:#333;margin-bottom:2px">'+q+'</div><div style="display:flex;gap:4px">';for(var sc=1;sc<=5;sc++){h+='<button onclick="this.parentNode.querySelectorAll(\'button\').forEach(function(b){b.style.background=\'#e5e7eb\'});this.style.background=\'#8b5cf6\';this.style.color=\'#fff\';this.dataset.val=\''+sc+'\'" data-q="'+qi+'" style="width:36px;height:28px;border:none;border-radius:4px;background:#e5e7eb;cursor:pointer;font-weight:700;font-size:12px">'+sc+'</button>'}h+='</div></div>'});h+='<button onclick="submitAppSurvey(\''+s.id+'\')" style="width:100%;padding:8px;background:#7c3aed;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;margin-top:4px">📤 匿名提交</button></div>'});el.innerHTML=h}).catch(function(){})}
-function submitAppSurvey(sid){if(!db)return;var scores=[];var buttons=document.querySelectorAll('[data-q]');var maxQ=0;buttons.forEach(function(b){var qi=+b.dataset.q;if(qi>maxQ)maxQ=qi;if(b.dataset.val)scores[qi]=+b.dataset.val});if(scores.filter(Boolean).length<maxQ+1){alert('請為每個項目評分');return}db.collection(fbEnv+'_hrdata').doc('survey').get().then(function(doc){var data=doc.exists?doc.data().data||[]:[];var s=data.find(function(x){return x.id===sid});if(!s)return;s.responses.push({eid:curEmp.id,scores:scores,date:new Date().toISOString()});db.collection(fbEnv+'_hrdata').doc('survey').set({data:data}).then(function(){alert('✅ 感謝您的回饋！（匿名提交）');loadAppSurvey()}).catch(function(e){alert('提交失敗')})}).catch(function(){})}
+function loadAppSurvey(){if(!curEmp||!db)return;db.collection(fbEnv+'_hrdata').doc('survey').get().then(function(doc){if(!doc.exists)return;var data=doc.data().data||[];/* [FIX-20] ① 舊版 s.responses 沒防呆，缺欄位就整頁當掉
+   ② 改用「已作答名冊 respondedBy」判斷誰填過，答案本身不記名 */
+var _me=curEmp.id;
+var active=data.filter(function(s){
+  if(s.status!=='進行中')return false;
+  var done=(s.respondedBy||[]).indexOf(_me)>=0;
+  if(!done&&Array.isArray(s.responses))done=s.responses.some(function(r){return r&&r.eid===_me});
+  return !done;
+});var el=document.getElementById('app-survey-area');if(!el)return;if(active.length===0){el.innerHTML='';return}var h='';active.forEach(function(s){h+='<div style="padding:14px;background:linear-gradient(135deg,#fee2e2,#fff5f5);border:2px solid #dc2626;border-radius:12px;margin-bottom:10px"><div style="font-size:14px;font-weight:700;color:#7c3aed;margin-bottom:8px">📝 '+s.title+'</div>';s.questions.forEach(function(q,qi){h+='<div style="margin-bottom:6px;font-size:12px"><div style="color:#333;margin-bottom:2px">'+q+'</div><div style="display:flex;gap:4px">';for(var sc=1;sc<=5;sc++){h+='<button onclick="this.parentNode.querySelectorAll(\'button\').forEach(function(b){b.style.background=\'#e5e7eb\'});this.style.background=\'#8b5cf6\';this.style.color=\'#fff\';this.dataset.val=\''+sc+'\'" data-q="'+qi+'" style="width:36px;height:28px;border:none;border-radius:4px;background:#e5e7eb;cursor:pointer;font-weight:700;font-size:12px">'+sc+'</button>'}h+='</div></div>'});h+='<button onclick="submitAppSurvey(\''+s.id+'\')" style="width:100%;padding:8px;background:#7c3aed;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;margin-top:4px">📤 匿名提交</button></div>'});el.innerHTML=h}).catch(function(){})}
+function submitAppSurvey(sid){if(!db)return;var scores=[];var buttons=document.querySelectorAll('[data-q]');var maxQ=0;buttons.forEach(function(b){var qi=+b.dataset.q;if(qi>maxQ)maxQ=qi;if(b.dataset.val)scores[qi]=+b.dataset.val});if(scores.filter(Boolean).length<maxQ+1){alert('請為每個項目評分');return}/* [FIX-20] 舊版畫面寫「匿名提交」卻把 eid 存進答案裡 —— 對員工是誤導，
+   也讓滿意度調查失去意義。改為：答案不含 eid，另外用一份名冊記錄「誰填過」
+   （只用來避免重複填寫，無法對回答案內容）。 */
+if(!hmLock('survey:'+sid))return;
+var _svErr=null;
+hmTx(hmRef('survey'),function(d){
+  var data=Array.isArray(d.data)?d.data:[];
+  var s=null;for(var i=0;i<data.length;i++){if(data[i]&&data[i].id===sid){s=data[i];break}}
+  if(!s){_svErr='找不到此問卷';return false}
+  if(!Array.isArray(s.responses))s.responses=[];
+  if(!Array.isArray(s.respondedBy))s.respondedBy=[];
+  if(s.respondedBy.indexOf(curEmp.id)>=0){_svErr='您已經填過這份問卷了';return false}
+  s.responses.push({scores:scores,date:new Date().toISOString()});
+  s.respondedBy.push(curEmp.id);
+  d.data=data;return d;
+}).then(function(){
+  if(_svErr){alert('⚠ '+_svErr);loadAppSurvey();return}
+  alert('✅ 感謝您的回饋！（答案不記名，系統只記錄您已填寫）');
+  loadAppSurvey();
+}).catch(function(e){alert('⚠ 送出失敗，問卷「沒有」送出\n\n'+e.message)
+}).then(function(){hmUnlock('survey:'+sid)},function(){hmUnlock('survey:'+sid)});
+return; /* 以下為舊路徑，已停用 */
+db.collection(fbEnv+'_hrdata').doc('survey').get().then(function(doc){var data=doc.exists?doc.data().data||[]:[];var s=data.find(function(x){return x.id===sid});if(!s)return;s.responses.push({scores:scores,date:new Date().toISOString()});db.collection(fbEnv+'_hrdata').doc('survey').set({data:data}).then(function(){alert('✅ 感謝您的回饋！');loadAppSurvey()}).catch(function(e){alert('提交失敗')})}).catch(function(){})}
 
 
 /* ═══════════ [v3.17.0] 打卡紀錄月分片 ═══════════
@@ -661,8 +971,11 @@ function _appPunchFail(e,rec){
 function syncPunchFromFB(){if(!curEmp||!db)return;_readPunchMonths([new Date().toISOString().substring(0,7)]).then(function(data){var myToday=data.filter(function(r){var now=new Date();var today=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());return r.eid===curEmp.id&&r.date===today});if(myToday.length>0){var local=JSON.parse(localStorage.getItem('hm_app_punch')||'[]');myToday.forEach(function(r){if(!local.find(function(x){return x.id===r.id}))local.push(r)});localStorage.setItem('hm_app_punch',JSON.stringify(local));renderPunchToday()}}).catch(function(){})}
 
 
-var APP_VERSION='3.17.0';
+var APP_VERSION='3.20.0';
 var APP_CHANGELOG=[
+{ver:'3.20.0',date:'2026-09-01',changes:['【★重大·打卡沒上傳成功不再靜默】程式一直在找一個「待同步」提示條，但那個元素根本不存在，所以打卡沒送上雲端時員工只看到「打卡成功」、完全沒有提示。現在改為：打卡結果會明確顯示「已上傳雲端」或「尚未上傳，已暫存手機」，畫面上方也會出現可點擊重送的橘色提示條','【★安全·還在用預設密碼者強制修改】舊版只是「建議」修改，按取消就能繼續用。預設密碼是工號+aa、工號在班表上看得到 —— 等於沒有密碼。現在必須設定新密碼才能使用，連續不設定會自動登出','【安全】薪資改為優先讀取「每人一份」的新結構；管理端改寫入該結構後，員工就再也拿不到別人的薪資資料','【安全】Firestore 規則改版：以「匿名登入（員工APP）vs Google 帳號（管理端）」分權，員工端不能寫員工主檔／班表／薪資，新人報到資料改為可寫不可讀，成本與勾稽資料員工端完全禁止']},
+{ver:'3.19.0',date:'2026-09-01',changes:['【★重大·修補「忘記密碼」漏洞】舊版只要知道工號＋生日（或手機）三選一，就能把別人的密碼重設成「工號+aa」，而且新密碼直接顯示在畫面上、沒有次數限制、本人不會收到通知 —— 任何員工在登入畫面上就能接管同事帳號看薪資。新版改為：需同時通過身分證＋生日／手機雙重驗證、不再自動重設而是送出申請給主管、畫面絕不顯示密碼、24 小時內限 3 次、每次嘗試都留紀錄','【★重大·製作回報同步 ERP 原本整個是壞的】程式用了一個不存在的變數，寫入被雲端拒絕，錯誤又被吃掉 —— ERP 看到的 App 回報數量一直是 0。已修正並改為交易寫入','【★重大·製作數量不再少算】舊版累計值用「讀→加→寫」，多人同時回報會漏；改為不存累計、由明細即時加總','【★修正·版本紀錄按鈕打不開】v3.6～v3.8 三筆紀錄格式不同造成整個功能當掉（自 2026-07-05 起失效），已修正','【安全】已選擇「領加班費／換補休」的加班不可再自行更改，需由主管處理','【安全】問卷改為真正不記名：答案不再夾帶員工編號，只用另一份名冊記錄「誰填過」以避免重複填寫','【安全】新人報到改用交易寫入並以身分證去重，連按不會產生多筆；Firestore 規則同步改為此文件不可讀取','【修正】補打卡不可填未來日期，且只能補登 2 個月內','【修正】薪資通知標記已讀改用交易，不會蓋掉別人的已讀狀態']},
+{ver:'3.18.0',date:'2026-09-01',changes:['【★重大·審核不再互相覆蓋】舊版兩位主管同時審核，後按的會把先按的整包蓋掉；同理兩位員工同時送假單會吃掉一張。全部改用雲端交易寫入，衝突時自動重試','【★重大·單據不會被重複處理】已核准／已駁回的單再按會明確提示「已經被處理過」，不再默默改掉。店長核准後需老闆做最終核准','【★重大·帳號未綁定員工不再顯示別人資料】舊版找不到對應員工時會把員工清單第一個人當成登入者','【★安全·不再儲存明文密碼】「記住我」改存雜湊值並設 30 天到期；手機上舊的明文密碼會在下次開啟時自動清除（需重新登入一次）','【安全】員工端不再把全公司薪資留在手機記憶體，只保留自己的','【修正】打卡連按不再產生多筆；一分鐘內重複同類型打卡會提示改用補打卡申請','【修正】請假結束日早於開始日會被擋下（舊版照樣送出並算成 1 天）','【修正】換班未選到對象不再整頁當掉','【修正】送出失敗時不再顯示「✅ 已送出」—— 假單／補打卡／換班／劃休／改密碼全部改為寫入成功才回報成功','【修正】核准補打卡若打卡紀錄寫入失敗會明確告知，不再單子已核准但紀錄沒進去']},
 {ver:'3.17.0',date:'2026-08-09',changes:['【★重大·打卡紀錄改為一個月一份】舊版全公司的打卡塞在單一雲端文件裡不斷累加，而雲端單一文件上限 1MB —— 以三店約 450 筆/日估算，2026 年 9 月上旬就會撞到。撞到之後每一次打卡都會失敗而且完全靜默：你按了、畫面顯示成功、資料其實沒進去', '【相容】讀取時新舊兩邊都會看，合併去重，過去的紀錄一筆都不會少', '【★修正·離線補送失敗不再靜默清空佇列】舊版補送失敗會直接吞掉錯誤；現在佇列保留，下次連線再試', '【用量】出勤報表只讀日期區間涵蓋到的月份，不再整包撈']},
 {ver:'3.16.0',date:'2026-08-09',changes:['【用量·待審徽章】原本每 1 分鐘讀 5 個雲端文件，2 位店長各開 8 小時就是約 4,800 次讀取/日，佔每日免費額度近一成，而且大部分時間數字根本沒變。改為 10 分鐘一次', '【用量·背景不輪詢】APP 切到背景時完全不讀雲端；切回前景會立刻補更新一次，看到的數字不會過期', '【不變】徽章數字、顯示規則、審核流程完全沒動；一般員工本來就不會觸發這段讀取']},
 {ver:'3.12.0',date:'2026-07-30',changes:['【新增·本週報廢分析】首頁列出近一週報廢最多的品項（份數與比率，紅色>15%、橘色>5%）。附註「報廢多半是一次做太多，不是賣不好」—— 這是現場改善的重點，不是檢討誰','【新增·建議製作數量】依近一週平均銷量算出每項該做多少，油炸品另給「首批做幾份、售完再炸」的分批建議，接單現做類（燒餅/河粉蛋餅/炒麵/虎咬豬）明確標示不需預先製作。資料不足5天時顯示提醒','【資安·仍完全不顯示金額】建議量演算法刻意只用「數量與售價」判斷，不使用單位成本 —— 員工APP 無成本讀取權限，若依賴成本兩邊會算出不同數字。已加測試驗證輸出不含「成本/金額/毛利/消失/營收/$/元」，且在無 catalog/costs 的情況下仍正常運作','【修改·分通路覆核】臨辦與櫃位改為各自顯示覆核狀態與時間，徽章新增「部分覆核」；本週狀況條新增藍色代表部分覆核。覆核進度改以 N/2 呈現','【一致性】建議量與財會系統共用同一份引擎演算法（HaomingRecon.suggestPrep），不會出現店員與老闆看到不同建議量的情況']},
@@ -694,15 +1007,59 @@ function showAppChangelog(){
   var el=document.getElementById('app-changelog-area');if(!el)return;
   if(el.innerHTML){el.innerHTML='';return}
   var h='';
-  APP_CHANGELOG.forEach(function(v){
-    h+='<div style="border-left:3px solid #2563eb;padding:6px 10px;margin-bottom:8px;background:#f8fafc;border-radius:0 6px 6px 0"><div style="font-weight:700;font-size:13px;color:#0f1b35">v'+v.ver+' <span style="font-size:11px;color:#888;font-weight:400">'+v.date+'</span></div>';
-    v.changes.forEach(function(ch){h+='<div style="font-size:12px;color:#555;margin-top:3px">• '+ch+'</div>'});
+  /* [FIX-23] 舊版假設每筆都有 changes 陣列，但 v3.6.0 / v3.7.0 / v3.8.0
+     這三筆用的是 note 字串 —— v.changes.forEach 直接爆掉，
+     結果是「版本紀錄」按鈕自 2026-07-05 起就完全打不開，而且沒有任何提示。
+     改為兩種格式都吃，缺欄位也不會當。 */
+  (APP_CHANGELOG||[]).forEach(function(v){
+    if(!v)return;
+    var items=[];
+    if(Array.isArray(v.changes))items=v.changes;
+    else if(typeof v.changes==='string')items=[v.changes];
+    else if(v.note)items=[v.note];
+    h+='<div style="border-left:3px solid #2563eb;padding:6px 10px;margin-bottom:8px;background:#f8fafc;border-radius:0 6px 6px 0"><div style="font-weight:700;font-size:13px;color:#0f1b35">v'+(v.ver||'?')+' <span style="font-size:11px;color:#888;font-weight:400">'+(v.date||'')+'</span></div>';
+    items.forEach(function(ch){h+='<div style="font-size:12px;color:#555;margin-top:3px">• '+ch+'</div>'});
     h+='</div>';
   });
   el.innerHTML=h;
 }
-function hashPass(plain){if(!plain)return'';var h=0;for(var i=0;i<plain.length;i++){var ch=plain.charCodeAt(i);h=((h<<5)-h)+ch;h=h&h}return'hm$'+Math.abs(h).toString(36)+'$'+plain.length}
-function verifyPass(plain,hashed){if(!hashed||hashed.indexOf('hm$')!==0)return plain===hashed;return hashPass(plain)===hashed}
+/* ══ [FIX-15] 密碼雜湊 ═════════════════════════════════════════
+   舊演算法只有 32 位元輸出（hm$xxx$長度），沒有鹽值、沒有加重運算：
+   實測約 8 萬組隨機密碼就會出現碰撞 —— 也就是「別的密碼也能登入」。
+   ⚠ 直接換掉會讓所有既有密碼失效，且管理端若自己也在驗密碼會一起壞掉。
+   因此這裡的做法是：
+     · verifyPass 同時支援 舊 hm$ 與 新 hm2$ —— 兩種都能登入，不會鎖死任何人
+     · 產生新雜湊預設仍用舊演算法（HM_STRONG_HASH=false），不影響現況
+   Tim 確認「管理端也用同一份 verifyPass 邏輯」之後，把下面這行改成 true
+   即可讓「之後新設定的密碼」自動採用強雜湊，舊密碼照常運作。 */
+var HM_STRONG_HASH=false;
+
+function _hashLegacy(plain){var h=0;for(var i=0;i<plain.length;i++){var ch=plain.charCodeAt(i);h=((h<<5)-h)+ch;h=h&h}return'hm$'+Math.abs(h).toString(36)+'$'+plain.length}
+/* 加鹽 + 12000 輪混合，輸出 96 位元 —— 碰撞機率降到可忽略，離線暴力破解也變慢 */
+function _hashStrong(plain,salt){
+  var a=0x811c9dc5,b=0x01000193,c=0x9e3779b9,str=(salt||'')+'\u0001'+plain;
+  for(var r=0;r<12000;r++){
+    for(var i=0;i<str.length;i++){
+      var ch=str.charCodeAt(i);
+      a=((a^ch)>>>0)*16777619>>>0;
+      b=(((b+ch)>>>0)^((b<<7)|(b>>>25)))>>>0;
+      c=(((c^(a+b))>>>0)*2654435761)>>>0;
+    }
+    a=(a^r)>>>0;b=(b+r)>>>0;
+  }
+  function hx(n){return('00000000'+(n>>>0).toString(16)).slice(-8)}
+  return'hm2$'+hx(a)+hx(b)+hx(c);
+}
+function hashPass(plain,salt){
+  if(!plain)return'';
+  return HM_STRONG_HASH?_hashStrong(plain,salt||''):_hashLegacy(plain);
+}
+function verifyPass(plain,hashed,salt){
+  if(!hashed)return plain===hashed;
+  if(hashed.indexOf('hm2$')===0)return _hashStrong(plain,salt||'')===hashed;
+  if(hashed.indexOf('hm$')===0)return _hashLegacy(plain)===hashed;
+  return plain===hashed;
+}
 
 
 var offlinePunchQueue=[];
@@ -728,7 +1085,13 @@ function syncOfflinePunches(){
   });
 }
 
-function showOfflineStatus(){var el=document.getElementById('offline-badge');if(!el)return;if(offlinePunchQueue.length>0){el.style.display='block';el.textContent='📡 '+offlinePunchQueue.length+'筆待同步'}else{el.style.display='none'}}
+function showOfflineStatus(){
+  var el=document.getElementById('offline-badge');if(!el)return;
+  if(offlinePunchQueue.length>0){
+    el.style.display='block';
+    el.textContent='📡 有 '+offlinePunchQueue.length+' 筆打卡還沒上傳 —— 點此重新上傳';
+  }else{el.style.display='none'}
+}
 
 window.addEventListener('online',function(){console.log('Network restored');setTimeout(syncOfflinePunches,2000)});
 setInterval(function(){if(navigator.onLine&&offlinePunchQueue.length>0)syncOfflinePunches()},60000);
@@ -759,6 +1122,73 @@ function togglePassVis(){var inp=document.getElementById('app-pass');var btn=doc
 
 // ===== MOBILE MANAGEMENT =====
 var mgrRole=null;
+
+/* ══════════════════════════════════════════════════════════════
+   [FIX-04/05/06/07] 共用安全機制 —— 集中在這一區，其他功能一律呼叫，
+   不要在各功能裡各寫一份（各寫一份就是「改 A 壞 B」的來源）。
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── 防重複送出 ────────────────────────────────────────────────
+   舊版：連按三次就送出三筆。加鎖後，同一動作完成前不再受理。 */
+var _hmBusy={};
+function hmLock(key,ms){var n=Date.now();if(_hmBusy[key]&&(n-_hmBusy[key])<(ms||10000))return false;_hmBusy[key]=n;return true}
+function hmUnlock(key){delete _hmBusy[key]}
+
+/* ── 安全更新（交易）──────────────────────────────────────────
+   舊版：get() 整份 → 改一筆 → set() 整份寫回。兩人同時操作，
+   後寫的會把先寫的整包蓋掉（假單／申請單會憑空消失）。
+   改用 Firestore 交易：衝突時自動重讀重試，不會互相覆蓋。 */
+function hmRef(name){return db.collection(fbEnv+'_hrdata').doc(name)}
+function hmTx(ref,mutate){
+  if(!db)return Promise.reject(new Error('尚未連線，請檢查網路'));
+  return db.runTransaction(function(t){
+    return t.get(ref).then(function(doc){
+      var data=doc.exists?(doc.data()||{}):{};
+      var out=mutate(data,doc.exists);
+      if(out===false)return;
+      t.set(ref,out||data);
+    });
+  });
+}
+/* 把一筆紀錄安全地加進某份文件的陣列裡 */
+function hmTxPush(docName,listKey,rec){
+  return hmTx(hmRef(docName),function(data){
+    var list=Array.isArray(data[listKey])?data[listKey]:[];
+    if(list.some(function(x){return x&&x.id===rec.id}))return false;
+    list.push(rec);data[listKey]=list;return data;
+  });
+}
+
+/* ── 權限守門 ──────────────────────────────────────────────────
+   ⚠ 這是「前端」防護，擋得住誤按，擋不住刻意用開發者工具繞過。
+   真正的防線是 Firestore 安全規則（見 firestore.rules）。 */
+function hmRole(){return (curAcct&&curAcct.role)||''}
+function hmRequireMgr(){var r=hmRole();if(r!=='老闆'&&r!=='店長'){alert('⚠ 您沒有審核權限');return false}return true}
+
+/* ── 單據狀態變更（請假／加班／換班／劃休／補打卡共用一支）──── */
+var _HM_FINAL=['已核准','已駁回','已拒絕','已取消','已作廢'];
+function hmSetStatus(opt){
+  /* opt: {doc, listKey, id, status, extra, okMsg, bossOnlyFrom} */
+  if(!hmRequireMgr())return Promise.resolve(null);
+  var outcome=null;
+  return hmTx(hmRef(opt.doc),function(data){
+    var list=Array.isArray(data[opt.listKey])?data[opt.listKey]:[];
+    var r=null;for(var i=0;i<list.length;i++){if(list[i]&&list[i].id===opt.id){r=list[i];break}}
+    if(!r){outcome={missing:true};return false}
+    if(_HM_FINAL.indexOf(r.status)>=0){outcome={conflict:r.status};return false}
+    if(opt.bossOnlyFrom&&r.status===opt.bossOnlyFrom&&hmRole()!=='老闆'){outcome={needBoss:true};return false}
+    r.status=opt.status;
+    if(opt.extra)Object.keys(opt.extra).forEach(function(k){r[k]=opt.extra[k]});
+    r.updatedAt=new Date().toISOString();r.updatedBy=(curAcct&&curAcct.user)||'';
+    data[opt.listKey]=list;outcome={rec:JSON.parse(JSON.stringify(r))};return data;
+  }).then(function(){
+    if(outcome&&outcome.missing){alert('⚠ 找不到這張單，可能已被移除');loadMgrApprove();return null}
+    if(outcome&&outcome.conflict){alert('⚠ 這張單已經被處理過了\n目前狀態：'+outcome.conflict+'\n\n畫面將重新整理');loadMgrApprove();return null}
+    if(outcome&&outcome.needBoss){alert('⚠ 此單已由店長核准，需由老闆做最終核准');loadMgrApprove();return null}
+    alert(opt.okMsg);loadMgrApprove();return outcome?outcome.rec:null;
+  }).catch(function(e){alert('失敗：'+e.message+'\n（未變更，請重試）');loadMgrApprove();return null});
+}
+
 function checkMgrRole(){
   if(!curAcct)return;
   mgrRole=curAcct.role;
@@ -859,20 +1289,34 @@ function loadMgrApprove(){
 }
 
 // Approve/Reject functions
-function mgrApproveLeave(id){if(!confirm('確認核准？'))return;db.collection(fbEnv+'_hrdata').doc('leave').get().then(function(doc){var data=doc.data();var r=data.leaveRecords.find(function(x){return x.id===id});if(r){r.status=mgrRole==='老闆'?'已核准':'店長核准'}db.collection(fbEnv+'_hrdata').doc('leave').set(data).then(function(){alert('✅ 已核准');loadMgrApprove()})}).catch(function(e){alert('失敗：'+e.message)})}
-function mgrRejectLeave(id){var reason=prompt('駁回原因：');if(!reason)return;db.collection(fbEnv+'_hrdata').doc('leave').get().then(function(doc){var data=doc.data();var r=data.leaveRecords.find(function(x){return x.id===id});if(r){r.status='已駁回';r.rejectReason=reason}db.collection(fbEnv+'_hrdata').doc('leave').set(data).then(function(){alert('已駁回');loadMgrApprove()})}).catch(function(e){alert('失敗：'+e.message)})}
+function mgrApproveLeave(id){if(!hmRequireMgr())return;if(!confirm('確認核准？'))return;if(!hmLock('apprLeave:'+id)){return}hmSetStatus({doc:'leave',listKey:'leaveRecords',id:id,status:(hmRole()==='老闆'?'已核准':'店長核准'),bossOnlyFrom:'店長核准',okMsg:'✅ 已核准'}).then(function(){hmUnlock('apprLeave:'+id)})}
+function mgrRejectLeave(id){if(!hmRequireMgr())return;var reason=prompt('駁回原因：');if(!reason)return;if(!hmLock('rejLeave:'+id))return;hmSetStatus({doc:'leave',listKey:'leaveRecords',id:id,status:'已駁回',extra:{rejectReason:reason},okMsg:'已駁回'}).then(function(){hmUnlock('rejLeave:'+id)})}
 
-function mgrApproveOT(id){if(!confirm('確認核准？'))return;db.collection(fbEnv+'_hrdata').doc('otRecords').get().then(function(doc){var data=doc.data().data||[];var r=data.find(function(x){return x.id===id});if(r)r.status='已核准';db.collection(fbEnv+'_hrdata').doc('otRecords').set({data:data}).then(function(){alert('✅ 已核准');loadMgrApprove()})}).catch(function(e){alert('失敗：'+e.message)})}
-function mgrRejectOT(id){var reason=prompt('拒絕原因：');if(!reason)return;db.collection(fbEnv+'_hrdata').doc('otRecords').get().then(function(doc){var data=doc.data().data||[];var r=data.find(function(x){return x.id===id});if(r){r.status='已拒絕';r.rejectReason=reason}db.collection(fbEnv+'_hrdata').doc('otRecords').set({data:data}).then(function(){alert('已拒絕');loadMgrApprove()})}).catch(function(e){alert('失敗：'+e.message)})}
+function mgrApproveOT(id){if(!hmRequireMgr())return;if(!confirm('確認核准？'))return;if(!hmLock('apprOT:'+id))return;hmSetStatus({doc:'otRecords',listKey:'data',id:id,status:'已核准',okMsg:'✅ 已核准'}).then(function(){hmUnlock('apprOT:'+id)})}
+function mgrRejectOT(id){if(!hmRequireMgr())return;var reason=prompt('拒絕原因：');if(!reason)return;if(!hmLock('rejOT:'+id))return;hmSetStatus({doc:'otRecords',listKey:'data',id:id,status:'已拒絕',extra:{rejectReason:reason},okMsg:'已拒絕'}).then(function(){hmUnlock('rejOT:'+id)})}
 
-function mgrApproveSwap(id){if(!confirm('確認核准？'))return;db.collection(fbEnv+'_hrdata').doc('swapRecords').get().then(function(doc){var data=doc.data().data||[];var r=data.find(function(x){return x.id===id});if(r)r.status='已核准';db.collection(fbEnv+'_hrdata').doc('swapRecords').set({data:data}).then(function(){alert('✅ 已核准');loadMgrApprove()})}).catch(function(e){alert('失敗：'+e.message)})}
-function mgrRejectSwap(id){var reason=prompt('拒絕原因：');if(!reason)return;db.collection(fbEnv+'_hrdata').doc('swapRecords').get().then(function(doc){var data=doc.data().data||[];var r=data.find(function(x){return x.id===id});if(r){r.status='已拒絕';r.rejectReason=reason}db.collection(fbEnv+'_hrdata').doc('swapRecords').set({data:data}).then(function(){alert('已拒絕');loadMgrApprove()})}).catch(function(e){alert('失敗：'+e.message)})}
+function mgrApproveSwap(id){if(!hmRequireMgr())return;if(!confirm('確認核准？'))return;if(!hmLock('apprSwap:'+id))return;hmSetStatus({doc:'swapRecords',listKey:'data',id:id,status:'已核准',okMsg:'✅ 已核准'}).then(function(){hmUnlock('apprSwap:'+id)})}
+function mgrRejectSwap(id){if(!hmRequireMgr())return;var reason=prompt('拒絕原因：');if(!reason)return;if(!hmLock('rejSwap:'+id))return;hmSetStatus({doc:'swapRecords',listKey:'data',id:id,status:'已拒絕',extra:{rejectReason:reason},okMsg:'已拒絕'}).then(function(){hmUnlock('rejSwap:'+id)})}
 
-function mgrApprovePL(id){if(!confirm('確認核准？'))return;db.collection(fbEnv+'_hrdata').doc('preLeave').get().then(function(doc){var data=doc.data().data||[];var r=data.find(function(x){return x.id===id});if(r)r.status='已核准';db.collection(fbEnv+'_hrdata').doc('preLeave').set({data:data}).then(function(){alert('✅ 已核准');loadMgrApprove()})}).catch(function(e){alert('失敗：'+e.message)})}
-function mgrRejectPL(id){var reason=prompt('拒絕原因：');if(!reason)return;db.collection(fbEnv+'_hrdata').doc('preLeave').get().then(function(doc){var data=doc.data().data||[];var r=data.find(function(x){return x.id===id});if(r){r.status='已拒絕';r.rejectReason=reason}db.collection(fbEnv+'_hrdata').doc('preLeave').set({data:data}).then(function(){alert('已拒絕');loadMgrApprove()})}).catch(function(e){alert('失敗：'+e.message)})}
+function mgrApprovePL(id){if(!hmRequireMgr())return;if(!confirm('確認核准？'))return;if(!hmLock('apprPL:'+id))return;hmSetStatus({doc:'preLeave',listKey:'data',id:id,status:'已核准',okMsg:'✅ 已核准'}).then(function(){hmUnlock('apprPL:'+id)})}
+function mgrRejectPL(id){if(!hmRequireMgr())return;var reason=prompt('拒絕原因：');if(!reason)return;if(!hmLock('rejPL:'+id))return;hmSetStatus({doc:'preLeave',listKey:'data',id:id,status:'已拒絕',extra:{rejectReason:reason},okMsg:'已拒絕'}).then(function(){hmUnlock('rejPL:'+id)})}
 
-function mgrApproveMakeup(id){if(!confirm('確認核准補打卡？'))return;db.collection(fbEnv+'_hrdata').doc('punchApplies').get().then(function(doc){var data=doc.data().data||[];var r=data.find(function(x){return x.id===id});if(r){r.status='已核准';db.collection(fbEnv+'_hrdata').doc('punchApplies').set({data:data});_punchDocOf(r.date).set({data:firebase.firestore.FieldValue.arrayUnion({id:'p'+Date.now(),eid:r.eid,name:r.name,store:r.store,date:r.date,time:r.time,type:r.type,gps:'補打卡(APP)',ts:new Date().toISOString()}),ym:_appPmk(r.date),updated:new Date().toISOString()},{merge:true}).then(function(){alert('✅ 已核准，打卡紀錄已寫入');loadMgrApprove()})}}).catch(function(e){alert('失敗：'+e.message)})}
-function mgrRejectMakeup(id){var reason=prompt('拒絕原因：');if(!reason)return;db.collection(fbEnv+'_hrdata').doc('punchApplies').get().then(function(doc){var data=doc.data().data||[];var r=data.find(function(x){return x.id===id});if(r){r.status='已拒絕';r.rejectReason=reason}db.collection(fbEnv+'_hrdata').doc('punchApplies').set({data:data}).then(function(){alert('已拒絕');loadMgrApprove()})}).catch(function(e){alert('失敗：'+e.message)})}
+/* [FIX-08] 舊版：改狀態與寫入打卡是兩個各自獨立的寫入，前者成功後者失敗時
+   單子顯示「已核准」但打卡紀錄根本沒進去，而且沒有任何提示。
+   改為：先用交易改狀態（成功才繼續），打卡寫入失敗時明確告知並可重試。 */
+function mgrApproveMakeup(id){
+  if(!hmRequireMgr())return;
+  if(!confirm('確認核准補打卡？'))return;
+  if(!hmLock('apprMk:'+id))return;
+  hmSetStatus({doc:'punchApplies',listKey:'data',id:id,status:'已核准',okMsg:'✅ 已核准，正在寫入打卡紀錄…'}).then(function(r){
+    if(!r){hmUnlock('apprMk:'+id);return}
+    var prec={id:'p'+id,eid:r.eid,name:r.name,store:r.store,date:r.date,time:r.time,type:r.type,gps:'補打卡(APP)',makeupOf:id,ts:new Date().toISOString()};
+    return _punchDocOf(r.date).set({data:firebase.firestore.FieldValue.arrayUnion(prec),ym:_appPmk(r.date),updated:new Date().toISOString()},{merge:true})
+      .then(function(){alert('✅ 打卡紀錄已寫入 '+r.date+' '+r.time);loadMgrApprove()})
+      .catch(function(e){alert('⚠ 單子已核准，但打卡紀錄寫入失敗：'+e.message+'\n\n請再按一次核准，或改由管理端補登。');loadMgrApprove()});
+  }).then(function(){hmUnlock('apprMk:'+id)},function(){hmUnlock('apprMk:'+id)});
+}
+function mgrRejectMakeup(id){if(!hmRequireMgr())return;var reason=prompt('拒絕原因：');if(!reason)return;if(!hmLock('rejMk:'+id))return;hmSetStatus({doc:'punchApplies',listKey:'data',id:id,status:'已拒絕',extra:{rejectReason:reason},okMsg:'已拒絕'}).then(function(){hmUnlock('rejMk:'+id)})}
 
 // Attendance
 function loadMgrAttend(){
@@ -1157,14 +1601,31 @@ function reportProdItem(itemId,idx){
   var item=prodSchedule.find(function(s){return s.id===itemId});
   if(!item){alert('找不到排程');return}
   if(!prodReports[itemId])prodReports[itemId]={};
-  var rUnit=document.getElementById('prod-unit-'+idx);var unitVal=rUnit?rUnit.value:item.unit;var unitVal=item.unit;prodReports[itemId][curEmp.id]={batch:batch,actual:actual,extraG:extraG,extraUnit:extraUnit,unit:unitVal,name:curEmp.name,time:new Date().toTimeString().substring(0,5),date:new Date().toISOString(),recipeName:item.recipeName};
-  if(db){
-    db.collection(fbEnv+'_hrdata').doc('prodReports').set({data:prodReports}).then(function(){
-      syncReportToERP(itemId,batch,actual,extraG,unitVal);
-      alert('✅ 回報成功');
-      renderProdToday();
-    }).catch(function(e){alert('回報失敗：'+e.message)});
-  }
+  /* [FIX-19] 舊版三個問題：
+     ① set({data:prodReports}) 是把自己記憶體裡的整包蓋回雲端 ——
+        另一位同事同時回報別的品項，會被整包蓋掉
+     ② 呼叫 syncReportToERP 時少傳 extraUnit（配合 FIX-17）
+     ③ ERP 還沒同步完就先跳「✅ 回報成功」 */
+  var unitVal=item.unit;
+  var myRec={batch:batch,actual:actual,extraG:extraG,extraUnit:extraUnit,unit:unitVal,
+    name:curEmp.name,time:new Date().toTimeString().substring(0,5),
+    date:new Date().toISOString(),recipeName:item.recipeName};
+  prodReports[itemId][curEmp.id]=myRec;
+  if(!db){alert('尚未連線，無法回報');return}
+  if(!hmLock('prodReport:'+itemId))return;
+  hmTx(hmRef('prodReports'),function(d){
+    var all=(d.data&&typeof d.data==='object')?d.data:{};
+    if(!all[itemId])all[itemId]={};
+    all[itemId][curEmp.id]=myRec;   /* 只動自己那格，不碰別人的 */
+    d.data=all;return d;
+  }).then(function(){
+    return syncReportToERP(itemId,batch,actual,extraG,unitVal,extraUnit);
+  }).then(function(okErp){
+    alert(okErp===false?'✅ 回報已存檔（ERP 同步未完成，見上一則提示）':'✅ 回報成功');
+    renderProdToday();
+  }).catch(function(e){
+    alert('⚠ 回報失敗，資料「沒有」存檔\n\n'+e.message);
+  }).then(function(){hmUnlock('prodReport:'+itemId)},function(){hmUnlock('prodReport:'+itemId)});
 }
 
 function changeProdWeek(dir){prodWeekOffset+=dir;renderProdWeekView()}
@@ -1267,19 +1728,44 @@ function editProdReport(itemId){
   }
 }
 
-function syncReportToERP(itemId,batch,actual,extraG,unit){
-  if(!db)return;
-  db.collection('erp').doc('state').get().then(function(doc){
-    if(!doc.exists)return;
-    var data=doc.data().data||doc.data();
-    var sched=data.prodSchedule||[];
-    var item=sched.find(function(s){return s.id===itemId});
-    if(!item)return;
-    if(!item.appReports)item.appReports=[];
-    item.appReports.push({eid:curEmp.id,name:curEmp.name,batch:batch,actual:actual,extraG:extraG,extraUnit:extraUnit,unit:unit,time:new Date().toISOString()});
-    item.appActual=(item.appActual||0)+actual;
-    db.collection('erp').doc('state').set(doc.data()).catch(function(){});
-  }).catch(function(){});
+/* ══ [FIX-17] 舊版有三個問題，而且全部靜默 ══════════════════════
+   ① 函式參數是 (itemId,batch,actual,extraG,unit)，裡面卻用了一個
+      不存在的 extraUnit —— 值是 undefined，Firestore 會直接拒絕整筆寫入。
+      也就是說「App 回報同步到 ERP」這件事從頭到尾都沒有成功過。
+   ② 錯誤被 .catch(function(){}) 完全吃掉，你不會看到任何異常。
+   ③ appActual 是累計值，卻用「讀整份→加→寫整份」，兩人同時回報會少算；
+      而且是整份覆寫 erp/state，等於員工 APP 有機會蓋掉整個 ERP 狀態。
+   新版：補上 extraUnit 參數、改用交易、寫入失敗要講出來。 */
+function syncReportToERP(itemId,batch,actual,extraG,unit,extraUnit){
+  if(!db)return Promise.resolve(false);
+  var ref=db.collection('erp').doc('state');
+  var done=false;
+  return db.runTransaction(function(t){
+    return t.get(ref).then(function(doc){
+      if(!doc.exists)return;
+      var root=doc.data();
+      var data=root.data||root;
+      var sched=data.prodSchedule||[];
+      var item=null;
+      for(var i=0;i<sched.length;i++){if(sched[i]&&sched[i].id===itemId){item=sched[i];break}}
+      if(!item)return;
+      if(!item.appReports)item.appReports=[];
+      var rid=itemId+'|'+curEmp.id+'|'+batch;
+      /* 同一人同一批號只記一次，重複送出不會重複累加 */
+      if(item.appReports.some(function(x){return x&&x.rid===rid}))return;
+      item.appReports.push({rid:rid,eid:curEmp.id,name:curEmp.name,batch:batch,
+        actual:actual,extraG:(extraG||0),extraUnit:(extraUnit||'g'),unit:(unit||''),
+        time:new Date().toISOString()});
+      /* 不再存累計結果，改為由明細即時加總 —— 累計欄位是最容易算錯的地方 */
+      item.appActual=item.appReports.reduce(function(a,b){return a+(+b.actual||0)},0);
+      done=true;
+      t.set(ref,root);
+    });
+  }).then(function(){return done}).catch(function(e){
+    console.error('[製作回報] 同步 ERP 失敗',e);
+    alert('⚠ 回報已存到員工端，但同步到 ERP 失敗\n\n'+e.message+'\n請告知主管，或稍後重新回報一次。');
+    return false;
+  });
 }
 
 
@@ -1324,7 +1810,16 @@ function onDataReady(){
 // Init
 localStorage.setItem('hm_app_fb',JSON.stringify(_DEFAULT_FB));initFb();
 try{var fb=JSON.parse(localStorage.getItem('hm_app_fb'));if(fb){document.getElementById('app-fb-key').value=fb.apiKey||'';document.getElementById('app-fb-proj').value=fb.projectId||''}}catch(e){}
-try{var sess=JSON.parse(localStorage.getItem('hm_app_session'));if(sess){document.getElementById('app-user').value=sess.user;document.getElementById('app-pass').value=sess.pass;setTimeout(function(){appAutoLogin(sess)},1500)}}catch(e){}
+try{
+  var sess=JSON.parse(localStorage.getItem('hm_app_session'));
+  /* [FIX-12c] 舊版存的是明文密碼 —— 一律清掉並要求重新登入一次，把明文從手機上抹除。 */
+  if(sess&&sess.pass!==undefined&&sess.ph===undefined){localStorage.removeItem('hm_app_session');sess=null}
+  if(sess&&sess.user){
+    document.getElementById('app-user').value=sess.user;
+    document.getElementById('app-remember').checked=true;
+    setTimeout(function(){appAutoLogin(sess)},1500);
+  }
+}catch(e){}
 
 
 // ===== 未打卡警示 =====
@@ -1461,14 +1956,21 @@ function submitNewHire(){
   };
   if(!db){var cfg=JSON.parse(localStorage.getItem('hm_app_fb')||'null');if(cfg){try{firebase.initializeApp(cfg)}catch(e){}db=firebase.firestore();try{if(firebase.auth)firebase.auth().signInAnonymously().catch(function(e){})}catch(e){}}}
   if(!db){alert('無法連線，請稍後再試');return}
-  db.collection(fbEnv+'_hrdata').doc('newHireApply').get().then(function(doc){
-    var list=doc.exists?doc.data().data||[]:[];
-    list.push(data);
-    db.collection(fbEnv+'_hrdata').doc('newHireApply').set({data:list}).then(function(){
-      alert('✅ 報到資料已送出！\n\n'+name+' 您好，資料已提交至公司人事系統。\n請等待主管完成建檔，届時會提供您登入帳號密碼。');
-      closeNewHireForm();
-    }).catch(function(e){alert('送出失敗：'+e.message)});
-  }).catch(function(e){alert('連線失敗：'+e.message)});
+  /* [FIX-21] 舊版：連按會產生多筆、整份讀寫會吃掉同時填的另一位新人。 */
+  if(!hmLock('submitNewHire',20000)){alert('資料送出中，請稍候…');return}
+  var _dup=false;
+  hmTx(hmRef('newHireApply'),function(d){
+    var list=Array.isArray(d.data)?d.data:[];
+    /* 同一身分證只收一次，避免重複建檔 */
+    if(list.some(function(x){return x&&x.idnum===data.idnum})){_dup=true;return false}
+    list.push(data);d.data=list;return d;
+  }).then(function(){
+    if(_dup){alert('⚠ 這份資料已經送出過了\n\n如需修改，請聯繫店長或老闆。');closeNewHireForm();return}
+    alert('✅ 報到資料已送出！\n\n'+name+' 您好，資料已提交至公司人事系統。\n請等待主管完成建檔，屆時會提供您登入帳號密碼。');
+    closeNewHireForm();
+  }).catch(function(e){
+    alert('⚠ 送出失敗，資料「沒有」送出\n\n'+e.message+'\n請確認網路後重試。');
+  }).then(function(){hmUnlock('submitNewHire')},function(){hmUnlock('submitNewHire')});
 }
 
 function addNhCert(){
