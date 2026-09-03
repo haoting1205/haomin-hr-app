@@ -479,6 +479,15 @@ function fT(h,m){return pad(h)+':'+pad(m)}
    員工只要在事由欄填一段 HTML，就會在「店長／老闆的審核畫面」上變成真的元素 ——
    等於一般員工可以影響權限最高的人所看到的畫面。一律先跳脫成純文字再顯示。
    （每日紀錄卡模組本來就有做，主程式漏了 —— 同一條規則寫兩份、只做了一半。） */
+/* [FIX-39] 舊版所有單據編號都是「前綴＋當下毫秒」。兩個「不同員工」在同一毫秒
+   送出（例如交接時段大家一起打卡、或網路恢復後多筆同時補送），會拿到完全相同的編號；
+   而防重複的機制是「編號一樣就當成重複丟掉」—— 結果是其中一位看到「✅ 已送出」，
+   雲端卻沒有他那一張。錯得很安靜，最難查。
+   改為「毫秒＋員工編號＋亂數」，不同人不可能撞在一起。 */
+function hmId(prefix){
+  var who=(typeof curEmp!=='undefined'&&curEmp&&curEmp.id)||(typeof curAcct!=='undefined'&&curAcct&&curAcct.user)||'x';
+  return prefix+Date.now()+'_'+String(who).replace(/[^\w]/g,'')+'_'+Math.random().toString(36).slice(2,7);
+}
 function hmEsc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 /* [FIX-28] 全系統統一的「本地今天／本月」。舊版多處用 toISOString()（UTC）當今天，
    台灣 00:00–08:00 之間會算成前一天 —— 早餐店清晨時段「今日出勤」「今日生產」會顯示昨天、
@@ -636,7 +645,7 @@ function appPunch(type){
     }
   }catch(e){}
   if(!hmLock('punch:'+type,5000)){alert('處理中，請稍候…');return}
-var pStore=document.getElementById('p-store');if(!pStore||!pStore.value){alert('請先選擇打卡門市');hmUnlock('punch:'+type);return}var _noGps=(!_lat||!_lng);if(_noGps){if(!confirm('\u26a0 \u76ee\u524d\u7121\u6cd5\u53d6\u5f97\u5b9a\u4f4d\n\n\u662f\u5426\u4ecd\u8981\u6253\u5361\uff1f\n\u6b64\u7b46\u5c07\u6a19\u8a18\u300c\u7121\u5b9a\u4f4d\u30fb\u5f85\u78ba\u8a8d\u300d\uff0c\u7531\u4e3b\u7ba1\u6838\u5c0d')){hmUnlock('punch:'+type);return}}var _psh=storeHours[pStore.value]||STORE_GEO[pStore.value];if(!_psh){alert('門市設定錯誤');hmUnlock('punch:'+type);return}var _pd=null;if(!_noGps&&_psh.lat){_pd=gpsDist(_lat,_lng,_psh.lat,_psh.lng);var _tol=(_gpsAcc||0);if(_pd>((_psh.radius||200)+_tol)){alert('\u26a0 \u4e0d\u5728\u300c'+pStore.value+'\u300d\u7bc4\u570d\u5185\n\n\u76ee\u524d\u8ddd\u96e2\uff1a'+Math.round(_pd)+'m\uff08GPS\u8aa4\u5dee\u00b1'+Math.round(_gpsAcc||0)+'m\uff09\n\u5141\u8a31\u7bc4\u570d\uff1a'+(_psh.radius||200)+'m\n\n\u8acb\u5728\u9580\u5e02\u7bc4\u570d\u5185\u3001\u6216\u65bc\u7a7a\u66e0\u8655\u5f85\u5b9a\u4f4d\u7cbe\u6e96\u5f8c\u518d\u6253\u5361');hmUnlock('punch:'+type);return}}/* PIN已取消 */var now=new Date();var today=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());var time=pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds());var rec={id:'p'+Date.now(),eid:curEmp.id,name:curEmp.name,store:(pStore?pStore.value:curEmp.store)||'',date:today,time:time,type:type,gps:_lat?(_lat.toFixed(5)+','+_lng.toFixed(5)):'無定位',acc:(_gpsAcc?Math.round(_gpsAcc):null),dist:(_pd!==null&&_pd!==undefined?Math.round(_pd):null),needChk:(_noGps||(_gpsAcc||0)>500),ts:now.toISOString()};var local=JSON.parse(localStorage.getItem('hm_app_punch')||'[]');local.push(rec);localStorage.setItem('hm_app_punch',JSON.stringify(local));/* [FIX-25] 上傳成功與否要讓員工看得到，不能只顯示「打卡成功」 */
+var pStore=document.getElementById('p-store');if(!pStore||!pStore.value){alert('請先選擇打卡門市');hmUnlock('punch:'+type);return}var _noGps=(!_lat||!_lng);if(_noGps){if(!confirm('\u26a0 \u76ee\u524d\u7121\u6cd5\u53d6\u5f97\u5b9a\u4f4d\n\n\u662f\u5426\u4ecd\u8981\u6253\u5361\uff1f\n\u6b64\u7b46\u5c07\u6a19\u8a18\u300c\u7121\u5b9a\u4f4d\u30fb\u5f85\u78ba\u8a8d\u300d\uff0c\u7531\u4e3b\u7ba1\u6838\u5c0d')){hmUnlock('punch:'+type);return}}var _psh=storeHours[pStore.value]||STORE_GEO[pStore.value];if(!_psh){alert('門市設定錯誤');hmUnlock('punch:'+type);return}var _pd=null;if(!_noGps&&_psh.lat){_pd=gpsDist(_lat,_lng,_psh.lat,_psh.lng);var _tol=(_gpsAcc||0);if(_pd>((_psh.radius||200)+_tol)){alert('\u26a0 \u4e0d\u5728\u300c'+pStore.value+'\u300d\u7bc4\u570d\u5185\n\n\u76ee\u524d\u8ddd\u96e2\uff1a'+Math.round(_pd)+'m\uff08GPS\u8aa4\u5dee\u00b1'+Math.round(_gpsAcc||0)+'m\uff09\n\u5141\u8a31\u7bc4\u570d\uff1a'+(_psh.radius||200)+'m\n\n\u8acb\u5728\u9580\u5e02\u7bc4\u570d\u5185\u3001\u6216\u65bc\u7a7a\u66e0\u8655\u5f85\u5b9a\u4f4d\u7cbe\u6e96\u5f8c\u518d\u6253\u5361');hmUnlock('punch:'+type);return}}/* PIN已取消 */var now=new Date();var today=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());var time=pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds());var rec={id:hmId('p'),eid:curEmp.id,name:curEmp.name,store:(pStore?pStore.value:curEmp.store)||'',date:today,time:time,type:type,gps:_lat?(_lat.toFixed(5)+','+_lng.toFixed(5)):'無定位',acc:(_gpsAcc?Math.round(_gpsAcc):null),dist:(_pd!==null&&_pd!==undefined?Math.round(_pd):null),needChk:(_noGps||(_gpsAcc||0)>500),ts:now.toISOString()};var local=JSON.parse(localStorage.getItem('hm_app_punch')||'[]');local.push(rec);localStorage.setItem('hm_app_punch',JSON.stringify(local));/* [FIX-25] 上傳成功與否要讓員工看得到，不能只顯示「打卡成功」 */
 if(db&&navigator.onLine){
   _punchDocOf(rec.date).set({data:firebase.firestore.FieldValue.arrayUnion(rec),ym:_appPmk(rec.date),updated:new Date().toISOString()},{merge:true})
     .then(function(){var _r=document.getElementById('p-result');
@@ -666,7 +675,7 @@ function renderSched(){document.getElementById('sched-month').textContent='民�
 
 function submitLeave(){if(!curEmp){alert('未綁定員工');return}var type=document.getElementById('al-type').value;var start=document.getElementById('al-start').value;var end=document.getElementById('al-end').value;var reason=document.getElementById('al-reason').value;var unit=document.getElementById('al-unit').value;if(!start||!end){alert('請選擇日期');return}/* [FIX-02] 舊版沒有檢查前後順序，反向區間會被 Math.max(1,…) 硬算成 1 天而照樣送出。 */var _ds=new Date(start),_de=new Date(end);if(isNaN(_ds.getTime())||isNaN(_de.getTime())){alert('日期格式不正確');return}if(_de<_ds){alert('⚠ 結束日不可早於開始日\n\n開始：'+start+'\n結束：'+end);return}if(!reason){alert('請填寫事由');return}var _span=Math.round((_de-_ds)/(24*60*60*1000))+1;if(unit==='半天'&&_span>1){alert('⚠ 半天假只能申請單一日期');return}var days=unit==='半天'?0.5:_span;/* [FIX-30] 舊版 month 取「班表頁當下在看第幾月」，員工先翻到別的月份再請假，
      假單就會被歸到錯的月份，管理端按月份篩選就找不到。改為跟著假單起始日。 */
-  var rec={id:'lv'+Date.now(),eid:curEmp.id,type:type,start:start,end:end,days:days,reason:reason,status:'待簽核',month:String(start).substring(0,7),unit:unit,agent:'',agentName:'',created:new Date().toISOString()};if(db){
+  var rec={id:hmId('lv'),eid:curEmp.id,type:type,start:start,end:end,days:days,reason:reason,status:'待簽核',month:String(start).substring(0,7),unit:unit,agent:'',agentName:'',created:new Date().toISOString()};if(db){
   /* [FIX-09] 舊版三個問題：①整份讀寫→兩人同時送會吃掉一張 ②set() 沒有 catch
      ③還沒寫成功就先 alert「✅ 已送出」，寫入失敗時員工以為送出了。 */
   if(!hmLock('submitLeave'))return;
@@ -728,7 +737,7 @@ function _forgotCount(user){
 }
 function _forgotLog(user,ok){
   try{
-    if(db)hmTxPush('errorLog','data',{id:'fg'+Date.now(),type:'密碼重設嘗試',user:user,ok:!!ok,ts:new Date().toISOString()});
+    if(db)hmTxPush('errorLog','data',{id:hmId('fg'),type:'密碼重設嘗試',user:user,ok:!!ok,ts:new Date().toISOString()});
   }catch(e){}
 }
 function doAppForgot(){
@@ -772,7 +781,7 @@ function doAppForgot(){
         }
         _forgotLog(user,true);
         hmTxPush('punchApplies','data',{
-          id:'pr'+Date.now(), kind:'密碼重設', eid:acct.empId, name:emp.name,
+          id:hmId('pr'), kind:'密碼重設', eid:acct.empId, name:emp.name,
           store:emp.store||'', date:todayStr(),
           reason:'員工於登入畫面申請密碼重設（已通過身分證＋生日/手機雙重驗證）',
           status:'待審核', submitDate:new Date().toISOString()
@@ -833,7 +842,7 @@ function submitPreLeave(){if(preLeaveSelected.length===0){alert('請先選擇休
      還是送得出去 —— 把按鈕藏起來不等於做了限制。送出時必須再驗一次。 */
   if(now.getDate()>10){alert('⚠ 已超過劃休截止日（每月10日）\n\n請聯繫店長協助處理。');return}
   if(preLeaveSelected.length>4){alert('⚠ 劃休最多4天');return}
-  var nextM=now.getMonth()+2;var nextY=now.getFullYear();if(nextM>12){nextM=1;nextY++}var mk=nextY+'-'+String(nextM).padStart(2,'0');var plStore=document.getElementById('preleave-store');var newPL={id:'pl'+Date.now(),eid:curEmp.id,name:curEmp.name,store:plStore?plStore.value:(curEmp.store||''),month:mk,dates:preLeaveSelected.slice().sort(),status:'待審核',submitDate:now.toISOString()};if(!hmLock('submitPreLeave'))return;
+  var nextM=now.getMonth()+2;var nextY=now.getFullYear();if(nextM>12){nextM=1;nextY++}var mk=nextY+'-'+String(nextM).padStart(2,'0');var plStore=document.getElementById('preleave-store');var newPL={id:hmId('pl'),eid:curEmp.id,name:curEmp.name,store:plStore?plStore.value:(curEmp.store||''),month:mk,dates:preLeaveSelected.slice().sort(),status:'待審核',submitDate:now.toISOString()};if(!hmLock('submitPreLeave'))return;
   /* [FIX-32] 同一人同一個月只能有一張。舊版 hmTxPush 只擋相同 id，換手機或隔 10 秒再按
      就會產生第二張，店長會看到兩份互相衝突的劃休。改為在交易裡檢查「同人同月」。 */
   var _plDup=false;
@@ -906,7 +915,7 @@ function submitMakeupPunch(){if(!curEmp||!db)return;var date=document.getElement
   if(isNaN(_md.getTime())){alert('日期格式不正確');return}
   if(_md>_t0){alert('⚠ 補打卡不能填未來的日期\n\n只能補登今天或今天以前忘記打的卡。');return}
   if((_t0-_md)>62*86400000){alert('⚠ 只能補登 2 個月內的打卡\n\n更早的紀錄請直接請主管在管理端處理。');return}if(!confirm('確認提交補打卡申請？\n\n日期：'+date+'\n時間：'+time+'\n類型：'+type+'\n原因：'+reason))return;if(!hmLock('submitMakeup'))return;
-  var _rec={id:'ma'+Date.now(),eid:curEmp.id,name:curEmp.name,store:curEmp.store||'',date:date,time:time+':00',type:type,reason:reason,status:'待審核',submitDate:new Date().toISOString()};
+  var _rec={id:hmId('ma'),eid:curEmp.id,name:curEmp.name,store:curEmp.store||'',date:date,time:time+':00',type:type,reason:reason,status:'待審核',submitDate:new Date().toISOString()};
   hmTxPushUnique('punchApplies','data',_rec,function(x){
     return x.eid===_rec.eid&&x.date===_rec.date&&x.time===_rec.time&&x.type===_rec.type&&x.status==='待審核';
   }).then(function(dup){
@@ -923,7 +932,7 @@ function loadStoreNotes(){if(!curEmp||!db)return;db.collection(fbEnv+'_hrdata').
 
 function openAppSwap(){if(!curEmp||!db)return;var h='<div style="font-size:16px;font-weight:700;color:#0f1b35;margin-bottom:12px">🔄 換班申請</div>';h+='<div style="margin-bottom:8px"><span style="font-size:11px;color:#666">換班日期</span><input class="fi" type="date" id="app-swap-date"></div>';h+='<div style="margin-bottom:8px"><span style="font-size:11px;color:#666">想換的對象</span><select class="fi" id="app-swap-target">';staff.forEach(function(e){if(e.id!==curEmp.id&&!e.leave_date)h+='<option value="'+e.id+'">'+e.name+'</option>'});h+='</select></div>';h+='<div style="margin-bottom:8px"><span style="font-size:11px;color:#666">原因</span><input class="fi" id="app-swap-reason" placeholder="換班原因"></div>';h+='<button onclick="submitAppSwap()" style="width:100%;padding:10px;background:#7c3aed;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">📤 提交換班申請</button>';h+='<div id="app-swap-list" style="margin-top:12px"></div>';document.getElementById('screen-swap').innerHTML='<div style="padding:16px">'+h+'</div>';loadAppSwapHistory()}
 function submitAppSwap(){if(!curEmp||!db)return;var date=document.getElementById('app-swap-date').value;var target=document.getElementById('app-swap-target').value;var reason=document.getElementById('app-swap-reason').value;if(!date||!target||!reason){alert('請填寫完整');return}var targetEmp=staff.find(function(x){return x.id===target});/* [FIX-03] 舊版直接讀 targetEmp.name，對象不存在時整個畫面當掉。 */if(!targetEmp){alert('⚠ 找不到換班對象，請重新選擇');return}if(targetEmp.id===curEmp.id){alert('⚠ 不能和自己換班');return}if(!confirm('確認提交換班申請？\n\n日期：'+date+'\n換班對象：'+targetEmp.name+'\n原因：'+reason))return;if(!hmLock('submitSwap'))return;
-  var _rec={id:'sw'+Date.now(),fromEid:curEmp.id,fromName:curEmp.name,toEid:target,toName:targetEmp.name,date:date,reason:reason,status:'待審核',submitDate:new Date().toISOString()};
+  var _rec={id:hmId('sw'),fromEid:curEmp.id,fromName:curEmp.name,toEid:target,toName:targetEmp.name,date:date,reason:reason,status:'待審核',submitDate:new Date().toISOString()};
   hmTxPushUnique('swapRecords','data',_rec,function(x){
     return x.fromEid===_rec.fromEid&&x.toEid===_rec.toEid&&x.date===_rec.date&&x.status==='待審核';
   }).then(function(dup){
@@ -1017,8 +1026,9 @@ function _appPunchFail(e,rec){
 function syncPunchFromFB(){if(!curEmp||!db)return;_readPunchMonths([ymStr()]).then(function(data){var myToday=data.filter(function(r){var now=new Date();var today=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());return r.eid===curEmp.id&&r.date===today});if(myToday.length>0){var local=JSON.parse(localStorage.getItem('hm_app_punch')||'[]');myToday.forEach(function(r){if(!local.find(function(x){return x.id===r.id}))local.push(r)});localStorage.setItem('hm_app_punch',JSON.stringify(local));renderPunchToday()}}).catch(function(){})}
 
 
-var APP_VERSION='3.24.0';
+var APP_VERSION='3.25.0';
 var APP_CHANGELOG=[
+{ver:'3.25.0',date:'2026-09-03',changes:['【★重大·兩個人在同一毫秒送出，其中一張會安靜地不見】所有單據編號都是「前綴＋當下毫秒」，兩位不同員工同時送出（交接時段一起打卡、或網路恢復後多筆一起補送）會拿到完全相同的編號；而防重複的機制是「編號一樣就當成重複丟掉」—— 結果其中一位看到「✅ 已送出」，雲端卻沒有他那一張。假單、劃休、換班、補打卡、打卡、新人報到全部受影響。編號改為「毫秒＋員工編號＋亂數」，不同人不可能再撞在一起']},
 {ver:'3.24.0',date:'2026-09-03',changes:['【★安全·員工填的文字會變成主管畫面上的程式碼】假單事由、補打卡原因、交接事項等欄位原本直接拼進畫面。員工只要在事由欄填一段網頁碼，就會在「店長／老闆的審核畫面」上變成真的元素 —— 等於一般員工可以影響權限最高的人看到的畫面。現在所有使用者填寫的文字一律先轉成純文字再顯示（交接事項的換行仍正常）','【修正】三筆舊版版本紀錄(v3.6～v3.8)格式與其他筆不同，先前曾害「版本紀錄」整個打不開。已把資料本身改成一致格式，移除這顆未爆彈','【修正】事由含引號不會再撐壞版面；超長文字也不會讓畫面當掉']},
 {ver:'3.23.0',date:'2026-09-03',changes:['【修正·換班可以重複送出】送出成功後表單不會清空，使用者很自然會再按一次，主管就收到兩張一模一樣的換班單。現在同一天、同一位對象、還在等審核時不會再收第二張，送出後也會清空表單','【修正·補打卡同樣可以重複送出】同一天同一時間同一類型的補打卡，等待審核期間不會再收第二張','【修正·製作回報打到一半的數字會被清掉】雲端推播或切回前景時整塊畫面會重畫，員工正在輸入的批號與數量會無聲消失、可能重打時打錯。現在重畫會保留已輸入的內容']},
 {ver:'3.22.0',date:'2026-09-02',changes:['【★重大·離線送出的假單永遠不會到主管手上】舊版顯示「假單已暫存」，但那張假單只存在手機裡、沒有任何補送程式 —— 員工以為請好假了，主管一張都沒收到，最後被當成曠職。現在改為：說清楚「還沒送到主管那裡」，並在恢復網路時自動補送（不會重複）','【★薪資頁可能整頁空白或當掉】某個月資料是空的就會讓整個薪資頁掛掉；且新的「每人一份」薪資結構讀不到，會顯示「尚無薪資紀錄」。兩種結構現在都讀得到，缺資料也不會當掉','【安全】劃休截止日（每月10日）改為送出時再驗一次 —— 舊版只是不畫按鈕，頁面開著沒關或換手機仍送得出去；並改為同一人同一個月只能有一張，避免店長收到兩份衝突的劃休','【修正】主管核准補打卡時若打卡寫入失敗，單子會停在「已核准」卻沒有打卡紀錄，而且因為是終結狀態再也按不了。現在改為自動退回「待審核」，可以真的重試','【修正】假單月份改為跟著假單起始日；舊版跟著「班表頁當下在看第幾月」，先翻月份再請假就會歸錯月，管理端篩選找不到','【修正】帳號沒綁員工時開啟劃休頁會整頁當掉','【修正】統一密碼加鹽方式，避免日後啟用強雜湊時改過密碼的人登不進來']},
@@ -2082,7 +2092,7 @@ function submitNewHire(){
     phone:phone,email:g('nh-email'),address:addr,
     emerg_name:emergName,emerg_phone:emergPhone,emerg_rel:g('nh-emerg-rel'),
     bank_name:bname,bank:bank,bank_code:g('nh-bcode'),branch:g('nh-branch'),branch_code:g('nh-brcode'),bank_acct:acct,
-    health_date:g('nh-health-date'),health_result:g('nh-health-result'),certs:collectNhCerts(),status:'待匯入',submitDate:new Date().toISOString(),submitId:'nh'+Date.now()
+    health_date:g('nh-health-date'),health_result:g('nh-health-result'),certs:collectNhCerts(),status:'待匯入',submitDate:new Date().toISOString(),submitId:hmId('nh')
   };
   if(!db){var cfg=JSON.parse(localStorage.getItem('hm_app_fb')||'null');if(cfg){try{firebase.initializeApp(cfg)}catch(e){}db=firebase.firestore();try{if(firebase.auth)firebase.auth().signInAnonymously().catch(function(e){})}catch(e){}}}
   if(!db){alert('無法連線，請稍後再試');return}
