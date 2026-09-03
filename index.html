@@ -475,6 +475,11 @@ var viewY=new Date().getFullYear()-1911,viewM=new Date().getMonth()+1;
 function pad(n){return String(n).padStart(2,'0')}
 function fNT(v){return'NT$'+Math.round(v).toLocaleString()}
 function fT(h,m){return pad(h)+':'+pad(m)}
+/* [FIX-28] 全系統統一的「本地今天／本月」。舊版多處用 toISOString()（UTC）當今天，
+   台灣 00:00–08:00 之間會算成前一天 —— 早餐店清晨時段「今日出勤」「今日生產」會顯示昨天、
+   把早班同仁全列為未打卡。打卡本身存的是本地日期，這兩支與它對齊。 */
+function todayStr(dt){var n=dt||new Date();return n.getFullYear()+'-'+pad(n.getMonth()+1)+'-'+pad(n.getDate())}
+function ymStr(dt){var n=dt||new Date();return n.getFullYear()+'-'+pad(n.getMonth()+1)}
 var LEAVE=['例假','休假','國定假日','補休','特休','事假','病假'];
 var DOW=['日','一','二','三','四','五','六'];
 
@@ -482,7 +487,7 @@ function saveAppFb(){var k=document.getElementById('app-fb-key').value.trim();va
 
 function initFb(){var cfg=null;try{cfg=JSON.parse(localStorage.getItem('hm_app_fb'))}catch(e){}if(!cfg)return false;try{var app;try{app=firebase.app()}catch(e){app=firebase.initializeApp(cfg)}db=firebase.firestore();try{firebase.auth().signInAnonymously().catch(function(){})}catch(e){}return true}catch(e){return false}}
 
-function appLogin(){var u=document.getElementById('app-user').value.trim();var p=document.getElementById('app-pass').value;if(!u||!p){showErr('請輸入帳號和密碼');return}if(!db){var localAccts=JSON.parse(localStorage.getItem('hm_app_accounts')||'[]');var acct=localAccts.find(function(a){return a.user===u&&verifyPass(p,a.pass)});if(acct){finishLogin(acct);return}showErr('請先設定Firebase連線');return}db.collection(fbEnv+'_hrdata').doc('accounts').get().then(function(doc){if(!doc.exists){showErr('無法取得帳號資料');return}var accounts=doc.data().userAccounts||[];var acct=accounts.find(function(a){return a.user===u&&verifyPass(p,a.pass)});if(!acct){showErr('帳號或密碼錯誤');return}localStorage.setItem('hm_app_accounts',JSON.stringify(accounts));acct._plain=p;finishLogin(acct)}).catch(function(e){var localAccts=JSON.parse(localStorage.getItem('hm_app_accounts')||'[]');var acct=localAccts.find(function(a){return a.user===u&&verifyPass(p,a.pass)});if(acct){document.getElementById('offline-bar').style.display='block';finishLogin(acct)}else{showErr('連線失敗：'+e.message)}})}
+function appLogin(){var u=document.getElementById('app-user').value.trim();var p=document.getElementById('app-pass').value;if(!u||!p){showErr('請輸入帳號和密碼');return}if(!db){var localAccts=JSON.parse(localStorage.getItem('hm_app_accounts')||'[]');var acct=localAccts.find(function(a){return a.user===u&&verifyPass(p,a.pass,a.user)});if(acct){finishLogin(acct);return}showErr('請先設定Firebase連線');return}db.collection(fbEnv+'_hrdata').doc('accounts').get().then(function(doc){if(!doc.exists){showErr('無法取得帳號資料');return}var accounts=doc.data().userAccounts||[];var acct=accounts.find(function(a){return a.user===u&&verifyPass(p,a.pass,a.user)});if(!acct){showErr('帳號或密碼錯誤');return}localStorage.setItem('hm_app_accounts',JSON.stringify(accounts));acct._plain=p;finishLogin(acct)}).catch(function(e){var localAccts=JSON.parse(localStorage.getItem('hm_app_accounts')||'[]');var acct=localAccts.find(function(a){return a.user===u&&verifyPass(p,a.pass,a.user)});if(acct){document.getElementById('offline-bar').style.display='block';finishLogin(acct)}else{showErr('連線失敗：'+e.message)}})}
 
 function finishLogin(acct){renderAppVersion();curAcct=acct;/* [FIX-12] 舊版把明文密碼寫進手機的 localStorage，手機被拿走或被其他網頁讀到就外洩。
    改存已雜湊的值，並記錄到期時間（30 天）。 */
@@ -491,7 +496,7 @@ if(document.getElementById('app-remember').checked){
 }else{localStorage.removeItem('hm_app_session')}document.getElementById('login-screen').style.display='none';checkMgrRole();loadData();/* ══ [R3] 舊版只是「建議」修改預設密碼，按取消就能繼續用。
    預設密碼是「工號+aa」，工號在班表上看得到 —— 只要有人沒改，
    那個帳號等於沒有密碼。改為：還在用預設密碼就必須改完才能用。 */
-if(verifyPass(acct.user+'aa',acct.pass)){setTimeout(function(){_forceChangePass()},800)}}
+if(verifyPass(acct.user+'aa',acct.pass,acct.user)){setTimeout(function(){_forceChangePass()},800)}}
 
 /* [R3] 強制修改預設密碼 —— 改完之前不放行 */
 function _forceChangePass(){
@@ -505,7 +510,7 @@ function _forceChangePass(){
     if(n===null){alert('必須設定新密碼才能使用 APP。');ask();return}
     if(n.length<8||n.length>16){alert('密碼長度需 8~16 字元');ask();return}
     if(!/[a-zA-Z]/.test(n)||!/[0-9]/.test(n)){alert('密碼需同時包含英文和數字');ask();return}
-    if(verifyPass(n,curAcct.pass)){alert('新密碼不可與預設密碼相同');ask();return}
+    if(verifyPass(n,curAcct.pass,curAcct.user)){alert('新密碼不可與預設密碼相同');ask();return}
     var c=prompt('請再輸入一次確認：');
     if(c!==n){alert('兩次輸入不一致');ask();return}
     var nh=hashPass(n,curAcct.user);
@@ -654,7 +659,9 @@ function loadViewSched(){_viewSched=null;renderSched();if(!db||!curEmp)return;db
 
 function renderSched(){document.getElementById('sched-month').textContent='民國'+viewY+'年'+viewM+'月';if(!curEmp){document.getElementById('sched-list').innerHTML='<div style="text-align:center;padding:20px;color:var(--gray4)">未綁定員工</div>';return}var D=new Date(viewY+1911,viewM,0).getDate();var h='';var SRC=(_viewSched!==null)?_viewSched:sched;for(var d=1;d<=D;d++){var dt=new Date(viewY+1911,viewM-1,d);var dw=dt.getDay();var key=(viewY+1911)+'-'+pad(viewM)+'-'+pad(d);var sc=SRC[curEmp.id]?SRC[curEmp.id][key]:null;var isWknd=dw===0||dw===6;var dayColor=isWknd?'#991b1b':'var(--gray6)';h+='<div class="sched-day" style="'+(isWknd?'background:#fff5f5;border-radius:8px;padding:10px;margin:-2px -4px':'')+'"><span class="day" style="color:'+dayColor+'">'+viewM+'/'+d+'<br><span style="font-size:11px;color:var(--gray4)">('+DOW[dw]+')</span></span>';if(sc&&LEAVE.indexOf(sc.type)>=0){var lc=sc.type==='例假'?'#166534':sc.type==='特休'?'#0e7490':sc.type==='事假'?'#991b1b':'#6d28d9';h+='<span class="leave" style="color:'+lc+'">'+sc.type+'</span>'}else if(sc&&sc.type==='restOT'){h+='<span class="leave" style="color:#1e40af">🌙休息日加班 '+fT(sc.sh,sc.sm)+'-'+fT(sc.eh,sc.em)+'</span>'}else if(sc){h+='<span class="time">'+fT(sc.sh,sc.sm)+' - '+fT(sc.eh,sc.em)+(sc.store&&sc.store!==curEmp.store?' <span style="font-size:10px;background:#7c3aed;color:#fff;padding:1px 6px;border-radius:4px;margin-left:4px">'+sc.store+'</span>':'')+'</span>'}else if(dw===0){h+='<span class="leave" style="color:#166534">例假</span>'}else if(curEmp){h+='<span class="time">'+fT(curEmp.sh||9,curEmp.sm||0)+' - '+fT(curEmp.eh||17,curEmp.em||0)+'</span>'}h+='</div>'}document.getElementById('sched-list').innerHTML=h}
 
-function submitLeave(){if(!curEmp){alert('未綁定員工');return}var type=document.getElementById('al-type').value;var start=document.getElementById('al-start').value;var end=document.getElementById('al-end').value;var reason=document.getElementById('al-reason').value;var unit=document.getElementById('al-unit').value;if(!start||!end){alert('請選擇日期');return}/* [FIX-02] 舊版沒有檢查前後順序，反向區間會被 Math.max(1,…) 硬算成 1 天而照樣送出。 */var _ds=new Date(start),_de=new Date(end);if(isNaN(_ds.getTime())||isNaN(_de.getTime())){alert('日期格式不正確');return}if(_de<_ds){alert('⚠ 結束日不可早於開始日\n\n開始：'+start+'\n結束：'+end);return}if(!reason){alert('請填寫事由');return}var _span=Math.round((_de-_ds)/(24*60*60*1000))+1;if(unit==='半天'&&_span>1){alert('⚠ 半天假只能申請單一日期');return}var days=unit==='半天'?0.5:_span;var rec={id:'lv'+Date.now(),eid:curEmp.id,type:type,start:start,end:end,days:days,reason:reason,status:'待簽核',month:(viewY+1911)+'-'+pad(viewM),unit:unit,agent:'',agentName:'',created:new Date().toISOString()};if(db){
+function submitLeave(){if(!curEmp){alert('未綁定員工');return}var type=document.getElementById('al-type').value;var start=document.getElementById('al-start').value;var end=document.getElementById('al-end').value;var reason=document.getElementById('al-reason').value;var unit=document.getElementById('al-unit').value;if(!start||!end){alert('請選擇日期');return}/* [FIX-02] 舊版沒有檢查前後順序，反向區間會被 Math.max(1,…) 硬算成 1 天而照樣送出。 */var _ds=new Date(start),_de=new Date(end);if(isNaN(_ds.getTime())||isNaN(_de.getTime())){alert('日期格式不正確');return}if(_de<_ds){alert('⚠ 結束日不可早於開始日\n\n開始：'+start+'\n結束：'+end);return}if(!reason){alert('請填寫事由');return}var _span=Math.round((_de-_ds)/(24*60*60*1000))+1;if(unit==='半天'&&_span>1){alert('⚠ 半天假只能申請單一日期');return}var days=unit==='半天'?0.5:_span;/* [FIX-30] 舊版 month 取「班表頁當下在看第幾月」，員工先翻到別的月份再請假，
+     假單就會被歸到錯的月份，管理端按月份篩選就找不到。改為跟著假單起始日。 */
+  var rec={id:'lv'+Date.now(),eid:curEmp.id,type:type,start:start,end:end,days:days,reason:reason,status:'待簽核',month:String(start).substring(0,7),unit:unit,agent:'',agentName:'',created:new Date().toISOString()};if(db){
   /* [FIX-09] 舊版三個問題：①整份讀寫→兩人同時送會吃掉一張 ②set() 沒有 catch
      ③還沒寫成功就先 alert「✅ 已送出」，寫入失敗時員工以為送出了。 */
   if(!hmLock('submitLeave'))return;
@@ -666,11 +673,17 @@ function submitLeave(){if(!curEmp){alert('未綁定員工');return}var type=docu
   }).catch(function(e){
     alert('⚠ 送出失敗，假單「沒有」送出\n\n'+e.message+'\n請確認網路後重試。');
   }).then(function(){hmUnlock('submitLeave')},function(){hmUnlock('submitLeave')});
-}else{var local=JSON.parse(localStorage.getItem('hm_app_leave')||'[]');local.push(rec);localStorage.setItem('hm_app_leave',JSON.stringify(local));alert('✅ 假單已暫存（離線模式）');renderLeave()}}
+}else{/* [FIX-29] 舊版顯示「✅ 假單已暫存」，但這份假單永遠不會上雲端 —— 員工以為請好假了，
+     主管那邊一張都沒有，最後被當成曠職。改為：說實話＋標記待補送＋恢復網路自動補送。 */
+  var local=JSON.parse(localStorage.getItem('hm_app_leave')||'[]');rec.status='待補送';local.push(rec);localStorage.setItem('hm_app_leave',JSON.stringify(local));alert('⚠ 目前沒有連線，這張假單「還沒送到主管那裡」\n\n已暫存在手機，恢復網路後會自動補送。\n請在恢復網路後回來確認狀態變成「待簽核」。');renderLeave()}}
 
 function renderLeave(){if(!curEmp){return}var myLeaves=leaveRecords.filter(function(r){return r.eid===curEmp.id}).reverse().slice(0,10);var local=JSON.parse(localStorage.getItem('hm_app_leave')||'[]').filter(function(r){return r.eid===curEmp.id}).reverse();var all=local.concat(myLeaves);var h='';if(!all.length)h='<div style="text-align:center;padding:16px;color:var(--gray4)">無假單紀錄</div>';all.forEach(function(r){var sc=r.status==='已核准'?'background:#dcfce7;color:#166534':r.status==='已駁回'?'background:#fee2e2;color:#991b1b':r.status==='店長核准'?'background:#dbeafe;color:#1e40af':'background:#fef3c7;color:#92400e';h+='<div class="list-item"><div style="flex:1"><div style="font-weight:700">'+r.type+' <span style="font-size:12px;color:var(--gray4)">'+r.days+'天</span></div><div style="font-size:12px;color:var(--gray4)">'+r.start+' ~ '+r.end+'</div><div style="font-size:12px;color:var(--gray4)">'+(r.reason||'')+'</div></div><span class="badge" style="'+sc+'">'+r.status+'</span></div>'});document.getElementById('leave-list').innerHTML=h}
 
-function renderPay(){if(!curEmp){return}var months=Object.keys(payHistory).sort().reverse();var h='';if(!months.length)h='<div style="text-align:center;padding:20px;color:var(--gray4)">尚無薪資紀錄<br><span style="font-size:12px">薪資由管理端每月存檔後顯示</span></div>';months.forEach(function(mk){var rec=payHistory[mk][curEmp.id];if(!rec)return;h+='<div class="list-item"><div style="flex:1"><div style="font-weight:700;font-size:14px">'+mk+'</div><div style="font-size:12px;color:var(--gray4)">出勤 '+rec.workDays+'天</div></div><div style="text-align:right"><div style="font-family:JetBrains Mono,monospace;font-weight:700;font-size:16px;color:#166534">'+fNT(rec.netPay)+'</div><div style="font-size:11px;color:var(--gray4)">應發 '+fNT(rec.gross)+'</div></div></div>'});h+=renderAppSupportPay();document.getElementById('pay-list').innerHTML=h}
+function renderPay(){if(!curEmp){return}var months=Object.keys(payHistory).sort().reverse();var h='';if(!months.length)h='<div style="text-align:center;padding:20px;color:var(--gray4)">尚無薪資紀錄<br><span style="font-size:12px">薪資由管理端每月存檔後顯示</span></div>';months.forEach(function(mk){var _m=payHistory[mk];if(!_m||typeof _m!=='object')return;var rec=_m[curEmp.id];
+/* [FIX-33] ① 某月資料是空的就整個薪資頁當掉（一片白）② prod_pay/{員工id} 的新結構是
+   「月→自己的紀錄」，沒有再包一層員工編號，舊寫法抓不到會顯示「尚無薪資紀錄」。 */
+if(!rec&&(_m.netPay!==undefined||_m.gross!==undefined))rec=_m;
+if(!rec)return;h+='<div class="list-item"><div style="flex:1"><div style="font-weight:700;font-size:14px">'+mk+'</div><div style="font-size:12px;color:var(--gray4)">出勤 '+(rec.workDays!==undefined?rec.workDays:'─')+'天</div></div><div style="text-align:right"><div style="font-family:JetBrains Mono,monospace;font-weight:700;font-size:16px;color:#166534">'+fNT(rec.netPay||0)+'</div><div style="font-size:11px;color:var(--gray4)">應發 '+fNT(rec.gross||0)+'</div></div></div>'});h+=renderAppSupportPay();document.getElementById('pay-list').innerHTML=h}
 
 function renderAppSupportPay(){if(!curEmp)return '';var months=Object.keys(appSupportPay||{}).sort().reverse();var has=false;var sec='';months.forEach(function(mk){var list=(appSupportPay[mk]||[]).filter(function(r){return r.eid===curEmp.id});if(!list.length)return;has=true;var byStore={};list.forEach(function(r){if(!byStore[r.store])byStore[r.store]={items:[],s:0};byStore[r.store].items.push(r);byStore[r.store].s+=r.hours*r.rate});Object.keys(byStore).forEach(function(st){var g=byStore[st];sec+='<div style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:12px;padding:12px;margin-bottom:10px"><div style="font-weight:700;font-size:14px;color:#0f766e;margin-bottom:6px">🤝 '+mk+' · '+st+' 支援時薪</div>';g.items.sort(function(a,b){return a.date>b.date?1:-1}).forEach(function(r){sec+='<div style="display:flex;align-items:center;gap:8px;font-size:13px;padding:4px 0;border-bottom:1px solid #ccfbf1"><span style="font-family:JetBrains Mono,monospace">'+r.date.substring(5)+'</span><span style="color:var(--gray4)">'+r.hours+'h × '+r.rate+'</span><span style="margin-left:auto;font-family:JetBrains Mono,monospace;font-weight:700">'+fNT(r.hours*r.rate)+'</span></div>'});sec+='<div style="display:flex;justify-content:space-between;margin-top:6px;font-weight:700;color:#0f766e"><span style="font-size:13px">小計</span><span style="font-family:JetBrains Mono,monospace">'+fNT(g.s)+'</span></div></div>'})});if(!has)return '';return '<div style="margin-top:18px"><div style="font-size:13px;font-weight:700;color:var(--gray6);margin-bottom:8px">🤝 跨店支援時薪</div>'+sec+'<div style="font-size:11px;color:var(--gray4);line-height:1.6">支援時薪為您本店月薪之外的額外工資；勞健保已於本店主單投保、不重複扣繳，所得稅併入主單歸戶。</div></div>'}
 
@@ -755,7 +768,7 @@ function doAppForgot(){
         _forgotLog(user,true);
         hmTxPush('punchApplies','data',{
           id:'pr'+Date.now(), kind:'密碼重設', eid:acct.empId, name:emp.name,
-          store:emp.store||'', date:new Date().toISOString().slice(0,10),
+          store:emp.store||'', date:todayStr(),
           reason:'員工於登入畫面申請密碼重設（已通過身分證＋生日/手機雙重驗證）',
           status:'待審核', submitDate:new Date().toISOString()
         }).then(function(){
@@ -766,16 +779,19 @@ function doAppForgot(){
     }).catch(function(e){alert('連線失敗：'+e.message)});
   }catch(e){alert('系統錯誤：'+e.message)}
 }
-function appChangePass(){if(!curAcct){alert('請先登入');return}var oldP=prompt('請輸入目前密碼：');if(!oldP)return;if(!verifyPass(oldP,curAcct.pass)){alert('密碼錯誤');return}var newP=prompt('請輸入新密碼（8~16字元，英文+數字）：');if(!newP)return;if(newP.length<8||newP.length>16){alert('密碼長度需8~16字元');return}if(!/[a-zA-Z]/.test(newP)||!/[0-9]/.test(newP)){alert('密碼需同時包含英文和數字');return}var confirmP=prompt('請再次輸入新密碼確認：');if(confirmP!==newP){alert('兩次輸入不一致');return}if(db){
+function appChangePass(){if(!curAcct){alert('請先登入');return}var oldP=prompt('請輸入目前密碼：');if(!oldP)return;if(!verifyPass(oldP,curAcct.pass,curAcct.user)){alert('密碼錯誤');return}var newP=prompt('請輸入新密碼（8~16字元，英文+數字）：');if(!newP)return;if(newP.length<8||newP.length>16){alert('密碼長度需8~16字元');return}if(!/[a-zA-Z]/.test(newP)||!/[0-9]/.test(newP)){alert('密碼需同時包含英文和數字');return}var confirmP=prompt('請再次輸入新密碼確認：');if(confirmP!==newP){alert('兩次輸入不一致');return}if(db){
   /* [FIX-13] 舊版：①整份讀寫（管理端同時改帳號會互相覆蓋）②set() 沒 catch，
      失敗仍顯示「✅ 已修改成功」③把新的明文密碼寫進 localStorage。 */
   if(!hmLock('changePass'))return;
-  var _nh=hashPass(newP),_found=false;
+  /* [FIX-34] 舊版這裡用 hashPass(newP) 沒帶 salt，_forceChangePass 卻用 hashPass(n,curAcct.user)。
+     目前 HM_STRONG_HASH=false（舊演算法忽略 salt）所以看不出來，但只要哪天開啟強雜湊，
+     兩邊產生的雜湊就會不一樣 —— 改過密碼的人會突然登不進來。先統一成帶帳號當 salt。 */
+  var _nh=hashPass(newP,curAcct.user),_found=false;
   hmTx(hmRef('accounts'),function(d){
     var accounts=d.userAccounts||[];
     var a=accounts.find(function(x){return x.user===curAcct.user});
     if(!a)return false;
-    if(!verifyPass(oldP,a.pass))return false;   /* 期間被管理端改過就中止 */
+    if(!verifyPass(oldP,a.pass,a.user))return false;   /* 期間被管理端改過就中止 */
     a.pass=_nh;_found=true;d.userAccounts=accounts;return d;
   }).then(function(){
     if(!_found){alert('⚠ 密碼未變更：帳號資料已被管理端更動，請重新登入後再試');return}
@@ -795,17 +811,33 @@ function appChangePass(){if(!curAcct){alert('請先登入');return}var oldP=prom
 }else{alert('請連線後再修改密碼')}}
 
 var preLeaveSelected=[];
-function renderPreLeave(){if(!curAcct)return;var now=new Date();var nextM=now.getMonth()+2;var nextY=now.getFullYear();if(nextM>12){nextM=1;nextY++}var mk=nextY+'-'+String(nextM).padStart(2,'0');var isOpen=now.getDate()<=10;var statusEl=document.getElementById('preleave-status');var calEl=document.getElementById('preleave-calendar');var selEl=document.getElementById('preleave-selected');var actEl=document.getElementById('preleave-actions');
+function renderPreLeave(){if(!curAcct)return;
+/* [FIX-31] 舊版只檢查 curAcct，後面卻讀 curEmp.id / curEmp.store —— 帳號沒綁員工時整頁當掉。 */
+if(!curEmp){var _pe=document.getElementById('preleave-status');if(_pe)_pe.innerHTML='<div style="padding:16px;background:#fee2e2;border-radius:10px;text-align:center;font-size:13px;color:#991b1b">此帳號尚未對應到員工資料，無法使用劃休。請聯絡管理員。</div>';['preleave-calendar','preleave-selected','preleave-actions'].forEach(function(i){var e=document.getElementById(i);if(e)e.innerHTML=''});return}
+var now=new Date();var nextM=now.getMonth()+2;var nextY=now.getFullYear();if(nextM>12){nextM=1;nextY++}var mk=nextY+'-'+String(nextM).padStart(2,'0');var isOpen=now.getDate()<=10;var statusEl=document.getElementById('preleave-status');var calEl=document.getElementById('preleave-calendar');var selEl=document.getElementById('preleave-selected');var actEl=document.getElementById('preleave-actions');
 var existing=null;if(db){db.collection(fbEnv+'_hrdata').doc('preLeave').get().then(function(doc){var data=doc.exists?doc.data().data||[]:[];existing=data.find(function(p){return p.eid===curEmp.id&&p.month===mk});renderPreLeaveUI(nextY,nextM,mk,isOpen,existing,statusEl,calEl,selEl,actEl)}).catch(function(){renderPreLeaveUI(nextY,nextM,mk,isOpen,null,statusEl,calEl,selEl,actEl)})}else{renderPreLeaveUI(nextY,nextM,mk,isOpen,null,statusEl,calEl,selEl,actEl)}}
-function renderPreLeaveUI(yr,mon,mk,isOpen,existing,statusEl,calEl,selEl,actEl){if(existing){var stColor=existing.status==='已核准'?'#166534':existing.status==='已拒絕'?'#991b1b':'#92400e';var stBg=existing.status==='已核准'?'#dcfce7':existing.status==='已拒絕'?'#fee2e2':'#fef3c7';statusEl.innerHTML='<div style="padding:12px;background:'+stBg+';border-radius:10px;margin-bottom:8px"><div style="font-size:14px;font-weight:700;color:'+stColor+'">'+existing.status+'</div><div style="font-size:12px;color:#666;margin-top:4px">休假日：'+existing.dates.join(', ')+'</div>'+(existing.rejectReason?'<div style="font-size:12px;color:#991b1b;margin-top:4px">原因：'+existing.rejectReason+'</div>':'')+'</div>';calEl.innerHTML='';selEl.innerHTML='';actEl.innerHTML=existing.status==='已拒絕'?'<button class="btn btn-blue" onclick="resetPreLeave()">重新申請</button>':'';return}
+function renderPreLeaveUI(yr,mon,mk,isOpen,existing,statusEl,calEl,selEl,actEl){if(existing){var stColor=existing.status==='已核准'?'#166534':existing.status==='已拒絕'?'#991b1b':'#92400e';var stBg=existing.status==='已核准'?'#dcfce7':existing.status==='已拒絕'?'#fee2e2':'#fef3c7';statusEl.innerHTML='<div style="padding:12px;background:'+stBg+';border-radius:10px;margin-bottom:8px"><div style="font-size:14px;font-weight:700;color:'+stColor+'">'+existing.status+'</div><div style="font-size:12px;color:#666;margin-top:4px">休假日：'+(existing.dates||[]).join(', ')+'</div>'+(existing.rejectReason?'<div style="font-size:12px;color:#991b1b;margin-top:4px">原因：'+existing.rejectReason+'</div>':'')+'</div>';calEl.innerHTML='';selEl.innerHTML='';actEl.innerHTML=existing.status==='已拒絕'?'<button class="btn btn-blue" onclick="resetPreLeave()">重新申請</button>':'';return}
 if(!isOpen){statusEl.innerHTML='<div style="padding:16px;background:#fee2e2;border-radius:10px;text-align:center"><div style="font-size:14px;font-weight:700;color:#991b1b">已超過截止日</div><div style="font-size:12px;color:#666;margin-top:4px">劃休截止日為每月10日，請下月再申請</div></div>';calEl.innerHTML='';selEl.innerHTML='';actEl.innerHTML='';return}
-statusEl.innerHTML='<div style="padding:10px;background:#dbeafe;border-radius:10px;font-size:12px;color:#1e40af;font-weight:700;margin-bottom:8px">請選擇 '+yr+'年'+mon+'月 想休假的日期（最多4天）</div><div style="margin-bottom:8px"><span style="font-size:11px;color:#666">劃休門市</span><select id="preleave-store" style="width:100%;padding:8px;border:2px solid #e8eaf0;border-radius:8px;font-size:14px;margin-top:4px"><option>'+(curEmp.store||'總公司')+'</option>'+(curEmp.store!=='總公司'?'<option>總公司</option>':'')+(curEmp.store!=='交大店'?'<option>交大店</option>':'')+(curEmp.store!=='台積電店'?'<option>台積電店</option>':'')+'<option>其他</option></select></div>';
+statusEl.innerHTML='<div style="padding:10px;background:#dbeafe;border-radius:10px;font-size:12px;color:#1e40af;font-weight:700;margin-bottom:8px">請選擇 '+yr+'年'+mon+'月 想休假的日期（最多4天）</div><div style="margin-bottom:8px"><span style="font-size:11px;color:#666">劃休門市</span><select id="preleave-store" style="width:100%;padding:8px;border:2px solid #e8eaf0;border-radius:8px;font-size:14px;margin-top:4px"><option>'+((curEmp&&curEmp.store)||'總公司')+'</option>'+((curEmp&&curEmp.store)!=='總公司'?'<option>總公司</option>':'')+((curEmp&&curEmp.store)!=='交大店'?'<option>交大店</option>':'')+((curEmp&&curEmp.store)!=='台積電店'?'<option>台積電店</option>':'')+'<option>其他</option></select></div>';
 var daysInMonth=new Date(yr,mon,0).getDate();var firstDay=new Date(yr,mon-1,1).getDay();var cal='<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center">';['日','一','二','三','四','五','六'].forEach(function(d){cal+='<div style="font-size:11px;font-weight:700;color:#666;padding:6px 0">'+d+'</div>'});for(var i=0;i<firstDay;i++)cal+='<div></div>';for(var d=1;d<=daysInMonth;d++){var dateStr=yr+'-'+String(mon).padStart(2,'0')+'-'+String(d).padStart(2,'0');var dow=new Date(yr,mon-1,d).getDay();var isSel=preLeaveSelected.indexOf(dateStr)>=0;var bg=isSel?'#2563eb':'#f8fafc';var clr=isSel?'#fff':dow===0||dow===6?'#dc2626':'#222';cal+='<div onclick="togglePreLeaveDate(this,\''+dateStr+'\')" style="padding:8px 4px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:700;background:'+bg+';color:'+clr+';border:2px solid '+(isSel?'#1d4ed8':'transparent')+'">'+d+'</div>'}cal+='</div>';calEl.innerHTML=cal;
 updatePreLeaveSelected(selEl,actEl)}
 function togglePreLeaveDate(el,dateStr){var idx=preLeaveSelected.indexOf(dateStr);if(idx>=0){preLeaveSelected.splice(idx,1)}else{if(preLeaveSelected.length>=4){alert('最多選擇4天');return}preLeaveSelected.push(dateStr)}renderPreLeave()}
 function updatePreLeaveSelected(selEl,actEl){if(preLeaveSelected.length>0){selEl.innerHTML='<div style="font-size:13px;font-weight:700;color:#0f1b35;margin-bottom:6px">已選擇 '+preLeaveSelected.length+'/4 天</div><div style="display:flex;flex-wrap:wrap;gap:4px">'+preLeaveSelected.sort().map(function(d){return'<span style="padding:4px 10px;background:#dbeafe;border-radius:6px;font-size:12px;font-weight:700;color:#1e40af">'+d.substring(5)+'</span>'}).join('')+'</div>';actEl.innerHTML='<button class="btn btn-blue" onclick="submitPreLeave()" style="width:100%;margin-top:8px;padding:12px;font-size:15px">📤 提交劃休申請</button>'}else{selEl.innerHTML='';actEl.innerHTML=''}}
-function submitPreLeave(){if(preLeaveSelected.length===0){alert('請先選擇休假日期');return}if(!curEmp||!db){alert('請先登入並連線');return}var now=new Date();var nextM=now.getMonth()+2;var nextY=now.getFullYear();if(nextM>12){nextM=1;nextY++}var mk=nextY+'-'+String(nextM).padStart(2,'0');var plStore=document.getElementById('preleave-store');var newPL={id:'pl'+Date.now(),eid:curEmp.id,name:curEmp.name,store:plStore?plStore.value:(curEmp.store||''),month:mk,dates:preLeaveSelected.sort(),status:'待審核',submitDate:now.toISOString()};if(!hmLock('submitPreLeave'))return;
-  hmTxPush('preLeave','data',newPL).then(function(){
+function submitPreLeave(){if(preLeaveSelected.length===0){alert('請先選擇休假日期');return}if(!curEmp||!db){alert('請先登入並連線');return}var now=new Date();
+  /* [FIX-32] 截止日原本只有畫面在擋（超過10號就不畫按鈕）。頁面開著沒關、或換一台手機，
+     還是送得出去 —— 把按鈕藏起來不等於做了限制。送出時必須再驗一次。 */
+  if(now.getDate()>10){alert('⚠ 已超過劃休截止日（每月10日）\n\n請聯繫店長協助處理。');return}
+  if(preLeaveSelected.length>4){alert('⚠ 劃休最多4天');return}
+  var nextM=now.getMonth()+2;var nextY=now.getFullYear();if(nextM>12){nextM=1;nextY++}var mk=nextY+'-'+String(nextM).padStart(2,'0');var plStore=document.getElementById('preleave-store');var newPL={id:'pl'+Date.now(),eid:curEmp.id,name:curEmp.name,store:plStore?plStore.value:(curEmp.store||''),month:mk,dates:preLeaveSelected.slice().sort(),status:'待審核',submitDate:now.toISOString()};if(!hmLock('submitPreLeave'))return;
+  /* [FIX-32] 同一人同一個月只能有一張。舊版 hmTxPush 只擋相同 id，換手機或隔 10 秒再按
+     就會產生第二張，店長會看到兩份互相衝突的劃休。改為在交易裡檢查「同人同月」。 */
+  var _plDup=false;
+  hmTx(hmRef('preLeave'),function(d){
+    var list=Array.isArray(d.data)?d.data:[];
+    if(list.some(function(x){return x&&x.eid===newPL.eid&&x.month===newPL.month&&x.status!=='已拒絕'})){_plDup=true;return false}
+    list.push(newPL);d.data=list;return d;
+  }).then(function(){
+    if(_plDup){alert('⚠ 您這個月已經送過劃休申請了\n\n如需修改，請聯繫店長。');renderPreLeave();return}
     preLeaveSelected=[];
     alert('✅ 劃休申請已提交\n\n'+mk+' 休假：'+newPL.dates.join(', ')+'\n\n請等待店長審核');
     renderPreLeave();
@@ -944,7 +976,7 @@ db.collection(fbEnv+'_hrdata').doc('survey').get().then(function(doc){var data=d
    以三店約 450 筆/日估算，2026 年 9 月上旬就會撞到 —— 撞到之後**每一次打卡都會失敗
    而且完全靜默**：你按了、畫面顯示成功、資料沒進去。
    現在改成 prod_punch/{年月}。相容期內讀取會同時看新分片與舊文件。 */
-function _appPmk(d){var x=String(d||'');return /^\d{4}-\d{2}/.test(x)?x.substring(0,7):new Date().toISOString().substring(0,7)}
+function _appPmk(d){var x=String(d||'');return /^\d{4}-\d{2}/.test(x)?x.substring(0,7):ymStr()}
 function _punchDocOf(dateStr){return db.collection(fbEnv+'_punch').doc(_appPmk(dateStr))}
 /* 讀取指定月份清單（含舊文件），合併去重 */
 function _readPunchMonths(months){
@@ -968,11 +1000,13 @@ function _appPunchFail(e,rec){
   console.error('[打卡] 寫入雲端失敗',e);
   if(rec&&typeof saveOfflinePunch==='function')saveOfflinePunch(rec);
 }
-function syncPunchFromFB(){if(!curEmp||!db)return;_readPunchMonths([new Date().toISOString().substring(0,7)]).then(function(data){var myToday=data.filter(function(r){var now=new Date();var today=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());return r.eid===curEmp.id&&r.date===today});if(myToday.length>0){var local=JSON.parse(localStorage.getItem('hm_app_punch')||'[]');myToday.forEach(function(r){if(!local.find(function(x){return x.id===r.id}))local.push(r)});localStorage.setItem('hm_app_punch',JSON.stringify(local));renderPunchToday()}}).catch(function(){})}
+function syncPunchFromFB(){if(!curEmp||!db)return;_readPunchMonths([ymStr()]).then(function(data){var myToday=data.filter(function(r){var now=new Date();var today=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());return r.eid===curEmp.id&&r.date===today});if(myToday.length>0){var local=JSON.parse(localStorage.getItem('hm_app_punch')||'[]');myToday.forEach(function(r){if(!local.find(function(x){return x.id===r.id}))local.push(r)});localStorage.setItem('hm_app_punch',JSON.stringify(local));renderPunchToday()}}).catch(function(){})}
 
 
-var APP_VERSION='3.20.0';
+var APP_VERSION='3.22.0';
 var APP_CHANGELOG=[
+{ver:'3.22.0',date:'2026-09-02',changes:['【★重大·離線送出的假單永遠不會到主管手上】舊版顯示「假單已暫存」，但那張假單只存在手機裡、沒有任何補送程式 —— 員工以為請好假了，主管一張都沒收到，最後被當成曠職。現在改為：說清楚「還沒送到主管那裡」，並在恢復網路時自動補送（不會重複）','【★薪資頁可能整頁空白或當掉】某個月資料是空的就會讓整個薪資頁掛掉；且新的「每人一份」薪資結構讀不到，會顯示「尚無薪資紀錄」。兩種結構現在都讀得到，缺資料也不會當掉','【安全】劃休截止日（每月10日）改為送出時再驗一次 —— 舊版只是不畫按鈕，頁面開著沒關或換手機仍送得出去；並改為同一人同一個月只能有一張，避免店長收到兩份衝突的劃休','【修正】主管核准補打卡時若打卡寫入失敗，單子會停在「已核准」卻沒有打卡紀錄，而且因為是終結狀態再也按不了。現在改為自動退回「待審核」，可以真的重試','【修正】假單月份改為跟著假單起始日；舊版跟著「班表頁當下在看第幾月」，先翻月份再請假就會歸錯月，管理端篩選找不到','【修正】帳號沒綁員工時開啟劃休頁會整頁當掉','【修正】統一密碼加鹽方式，避免日後啟用強雜湊時改過密碼的人登不進來']},
+{ver:'3.21.0',date:'2026-09-02',changes:['【★重大·新人報到只有第一位送得出去】重複判斷比對到不存在的欄位，第一位新人送出後，之後每一位都被誤判為「已送出過」而完全無法報到。已修正為比對正確的身分證欄位','【★製作補填/修改會吃掉同事的回報】「過去補填」與「修改回報」兩支仍用整包覆寫雲端（先前只修了即時回報那一支），多人同時回報會互相蓋掉；且同步到 ERP 時漏傳零頭單位，一律被記成 g。已改為交易只寫自己那格、補回單位、並防連按重複送出','【修正·清晨顯示昨天】「今日出勤」「今日生產排程」等改用手機本地日期計算；舊版用世界時計算，台灣清晨 0～8 點會顯示前一天、把早班同仁全列為未打卡']},
 {ver:'3.20.0',date:'2026-09-01',changes:['【★重大·打卡沒上傳成功不再靜默】程式一直在找一個「待同步」提示條，但那個元素根本不存在，所以打卡沒送上雲端時員工只看到「打卡成功」、完全沒有提示。現在改為：打卡結果會明確顯示「已上傳雲端」或「尚未上傳，已暫存手機」，畫面上方也會出現可點擊重送的橘色提示條','【★安全·還在用預設密碼者強制修改】舊版只是「建議」修改，按取消就能繼續用。預設密碼是工號+aa、工號在班表上看得到 —— 等於沒有密碼。現在必須設定新密碼才能使用，連續不設定會自動登出','【安全】薪資改為優先讀取「每人一份」的新結構；管理端改寫入該結構後，員工就再也拿不到別人的薪資資料','【安全】Firestore 規則改版：以「匿名登入（員工APP）vs Google 帳號（管理端）」分權，員工端不能寫員工主檔／班表／薪資，新人報到資料改為可寫不可讀，成本與勾稽資料員工端完全禁止']},
 {ver:'3.19.0',date:'2026-09-01',changes:['【★重大·修補「忘記密碼」漏洞】舊版只要知道工號＋生日（或手機）三選一，就能把別人的密碼重設成「工號+aa」，而且新密碼直接顯示在畫面上、沒有次數限制、本人不會收到通知 —— 任何員工在登入畫面上就能接管同事帳號看薪資。新版改為：需同時通過身分證＋生日／手機雙重驗證、不再自動重設而是送出申請給主管、畫面絕不顯示密碼、24 小時內限 3 次、每次嘗試都留紀錄','【★重大·製作回報同步 ERP 原本整個是壞的】程式用了一個不存在的變數，寫入被雲端拒絕，錯誤又被吃掉 —— ERP 看到的 App 回報數量一直是 0。已修正並改為交易寫入','【★重大·製作數量不再少算】舊版累計值用「讀→加→寫」，多人同時回報會漏；改為不存累計、由明細即時加總','【★修正·版本紀錄按鈕打不開】v3.6～v3.8 三筆紀錄格式不同造成整個功能當掉（自 2026-07-05 起失效），已修正','【安全】已選擇「領加班費／換補休」的加班不可再自行更改，需由主管處理','【安全】問卷改為真正不記名：答案不再夾帶員工編號，只用另一份名冊記錄「誰填過」以避免重複填寫','【安全】新人報到改用交易寫入並以身分證去重，連按不會產生多筆；Firestore 規則同步改為此文件不可讀取','【修正】補打卡不可填未來日期，且只能補登 2 個月內','【修正】薪資通知標記已讀改用交易，不會蓋掉別人的已讀狀態']},
 {ver:'3.18.0',date:'2026-09-01',changes:['【★重大·審核不再互相覆蓋】舊版兩位主管同時審核，後按的會把先按的整包蓋掉；同理兩位員工同時送假單會吃掉一張。全部改用雲端交易寫入，衝突時自動重試','【★重大·單據不會被重複處理】已核准／已駁回的單再按會明確提示「已經被處理過」，不再默默改掉。店長核准後需老闆做最終核准','【★重大·帳號未綁定員工不再顯示別人資料】舊版找不到對應員工時會把員工清單第一個人當成登入者','【★安全·不再儲存明文密碼】「記住我」改存雜湊值並設 30 天到期；手機上舊的明文密碼會在下次開啟時自動清除（需重新登入一次）','【安全】員工端不再把全公司薪資留在手機記憶體，只保留自己的','【修正】打卡連按不再產生多筆；一分鐘內重複同類型打卡會提示改用補打卡申請','【修正】請假結束日早於開始日會被擋下（舊版照樣送出並算成 1 天）','【修正】換班未選到對象不再整頁當掉','【修正】送出失敗時不再顯示「✅ 已送出」—— 假單／補打卡／換班／劃休／改密碼全部改為寫入成功才回報成功','【修正】核准補打卡若打卡紀錄寫入失敗會明確告知，不再單子已核准但紀錄沒進去']},
@@ -1093,7 +1127,32 @@ function showOfflineStatus(){
   }else{el.style.display='none'}
 }
 
-window.addEventListener('online',function(){console.log('Network restored');setTimeout(syncOfflinePunches,2000)});
+/* [FIX-29] 離線暫存的假單必須會自己補送。舊版只寫進手機、沒有任何補送程式，
+   假單就卡在手機裡永遠不會到主管手上。與打卡的補送機制對齊。 */
+function syncOfflineLeaves(){
+  if(!db)return Promise.resolve();
+  var local=[];try{local=JSON.parse(localStorage.getItem('hm_app_leave')||'[]')}catch(e){}
+  if(!local.length)return Promise.resolve();
+  var okIds=[];
+  return local.reduce(function(chain,rec){
+    return chain.then(function(){
+      if(!rec||!rec.id)return;
+      var r=Object.assign({},rec);if(r.status==='待補送')r.status='待簽核';
+      /* hmTxPush 以 id 去重，重複補送不會產生第二張 */
+      return hmTxPush('leave','leaveRecords',r).then(function(){
+        okIds.push(rec.id);
+        if(!leaveRecords.some(function(x){return x&&x.id===r.id}))leaveRecords.push(r);
+      }).catch(function(){});
+    });
+  },Promise.resolve()).then(function(){
+    if(!okIds.length)return;
+    var left=local.filter(function(r){return r&&okIds.indexOf(r.id)<0});
+    try{localStorage.setItem('hm_app_leave',JSON.stringify(left))}catch(e){}
+    try{renderLeave()}catch(e){}
+    alert('✅ 已把離線期間暫存的 '+okIds.length+' 張假單補送給主管');
+  });
+}
+window.addEventListener('online',function(){console.log('Network restored');setTimeout(syncOfflinePunches,2000);setTimeout(syncOfflineLeaves,2500)});
 setInterval(function(){if(navigator.onLine&&offlinePunchQueue.length>0)syncOfflinePunches()},60000);
 
 
@@ -1311,9 +1370,19 @@ function mgrApproveMakeup(id){
   hmSetStatus({doc:'punchApplies',listKey:'data',id:id,status:'已核准',okMsg:'✅ 已核准，正在寫入打卡紀錄…'}).then(function(r){
     if(!r){hmUnlock('apprMk:'+id);return}
     var prec={id:'p'+id,eid:r.eid,name:r.name,store:r.store,date:r.date,time:r.time,type:r.type,gps:'補打卡(APP)',makeupOf:id,ts:new Date().toISOString()};
+    /* [FIX-35] 舊版：狀態已改成「已核准」但打卡沒寫進去。「已核准」是終結狀態，
+       再按一次會被 hmSetStatus 擋掉 —— 提示說「請再按一次核准」其實做不到，
+       單子就永遠卡在「已核准但沒有打卡紀錄」。改為：成功才蓋章，失敗就退回待審核可重試。 */
+    function _mkStamp(mut){return hmTx(hmRef('punchApplies'),function(d){
+      var list=Array.isArray(d.data)?d.data:[];
+      var x=null;for(var i=0;i<list.length;i++){if(list[i]&&list[i].id===id){x=list[i];break}}
+      if(!x)return false;mut(x);x.updatedAt=new Date().toISOString();d.data=list;return d;
+    }).catch(function(){})}
     return _punchDocOf(r.date).set({data:firebase.firestore.FieldValue.arrayUnion(prec),ym:_appPmk(r.date),updated:new Date().toISOString()},{merge:true})
-      .then(function(){alert('✅ 打卡紀錄已寫入 '+r.date+' '+r.time);loadMgrApprove()})
-      .catch(function(e){alert('⚠ 單子已核准，但打卡紀錄寫入失敗：'+e.message+'\n\n請再按一次核准，或改由管理端補登。');loadMgrApprove()});
+      .then(function(){return _mkStamp(function(x){x.punchWritten=true}).then(function(){
+        alert('✅ 打卡紀錄已寫入 '+r.date+' '+r.time);loadMgrApprove()})})
+      .catch(function(e){return _mkStamp(function(x){x.status='待審核';x.punchWritten=false;x.lastError='打卡寫入失敗：'+e.message}).then(function(){
+        alert('⚠ 打卡紀錄寫入失敗：'+e.message+'\n\n這張單已「退回待審核」，網路正常後再核准一次即可（不會重複寫入）。');loadMgrApprove()})});
   }).then(function(){hmUnlock('apprMk:'+id)},function(){hmUnlock('apprMk:'+id)});
 }
 function mgrRejectMakeup(id){if(!hmRequireMgr())return;var reason=prompt('拒絕原因：');if(!reason)return;if(!hmLock('rejMk:'+id))return;hmSetStatus({doc:'punchApplies',listKey:'data',id:id,status:'已拒絕',extra:{rejectReason:reason},okMsg:'已拒絕'}).then(function(){hmUnlock('rejMk:'+id)})}
@@ -1321,7 +1390,7 @@ function mgrRejectMakeup(id){if(!hmRequireMgr())return;var reason=prompt('拒絕
 // Attendance
 function loadMgrAttend(){
   if(!db)return;
-  var today=new Date().toISOString().substring(0,10);
+  var today=todayStr();
   var _t=new Date();var _m1=_t.getFullYear()+'-'+String(_t.getMonth()+1).padStart(2,'0')+'-01';document.getElementById('mgr-att-d1').value=_m1;document.getElementById('mgr-att-d2').value=today;
   var sel=document.getElementById('mgr-att-emp');
   sel.innerHTML='<option value="">全部員工</option>';
@@ -1530,7 +1599,7 @@ function loadProdReports(){
 }
 function showProdHomeRemind(){
   if(!curEmp||curEmp.store!=='總公司')return;
-  var today=new Date().toISOString().substring(0,10);
+  var today=todayStr();
   var items=prodSchedule.filter(function(s){return s.date===today&&s.status!=='已取消'});
   var el=document.getElementById('prod-home-remind');
   if(!el||items.length===0){if(el)el.innerHTML='';return}
@@ -1544,7 +1613,7 @@ function checkShowProdTab(){
 }
 function renderProdToday(){
   if(!curEmp)return;
-  var today=new Date().toISOString().substring(0,10);
+  var today=todayStr();
   var items=prodSchedule.filter(function(s){return s.date===today&&s.status!=='已取消'});
   var h='';
   if(items.length===0){
@@ -1630,12 +1699,12 @@ function reportProdItem(itemId,idx){
 
 function changeProdWeek(dir){prodWeekOffset+=dir;renderProdWeekView()}
 function renderProdWeekView(){
-  var now=new Date();var today=now.toISOString().substring(0,10);
+  var now=new Date();var today=todayStr(now);
   var DOW3=['日','一','二','三','四','五','六'];
   var weekStart=new Date(now);weekStart.setDate(weekStart.getDate()-weekStart.getDay()+1+(prodWeekOffset*7));
   var titleEl=document.getElementById('prod-week-title');
   if(titleEl)titleEl.textContent=prodWeekOffset===0?'📋 本週排程總覽':'📋 排程總覽（'+(prodWeekOffset>0?'+':'')+prodWeekOffset+'週）';
-  var dates=[];for(var i=0;i<6;i++){var d=new Date(weekStart);d.setDate(d.getDate()+i);dates.push(d.toISOString().substring(0,10))}
+  var dates=[];for(var i=0;i<6;i++){var d=new Date(weekStart);d.setDate(d.getDate()+i);dates.push(todayStr(d))}
   var h='';
   var hasAny=false;
   dates.forEach(function(dk){
@@ -1689,22 +1758,32 @@ function fillPastReport(item){
   if(extraG===null)return;
   var extraUnit='g';
   if(+extraG>0){extraUnit=prompt('零頭單位（g/支/個/包）：','g');if(extraUnit===null)return}
-  if(!prodReports[item.id])prodReports[item.id]={};
-  prodReports[item.id][curEmp.id]={batch:batch,actual:+actual,extraG:+extraG||0,extraUnit:extraUnit,unit:item.unit,name:curEmp.name,time:new Date().toTimeString().substring(0,5),date:new Date().toISOString(),recipeName:item.recipeName};
-  if(db){
-    db.collection(fbEnv+'_hrdata').doc('prodReports').set({data:prodReports}).then(function(){
-      syncReportToERP(item.id,batch,+actual,+extraG||0,item.unit);
-      alert('✅ 已填寫');
-      renderProdWeekView();
-      renderProdToday();
-    }).catch(function(e){alert('失敗：'+e.message)});
-  }
+  var _rec={batch:batch,actual:+actual,extraG:+extraG||0,extraUnit:extraUnit,unit:item.unit,name:curEmp.name,time:new Date().toTimeString().substring(0,5),date:new Date().toISOString(),recipeName:item.recipeName};
+  if(!db){alert('尚未連線，無法回報');return}
+  /* [FIX-27] 舊版用 set({data:prodReports}) 整包覆寫雲端 —— 同事同時回報會被吃掉；
+     且呼叫 syncReportToERP 少傳 extraUnit，ERP 一律記成 g。這與 reportProdItem 是同一條規則，
+     舊版只修了 reportProdItem 卻漏了這裡（改 A 沒改 B）。改為交易只寫自己那格＋補 extraUnit＋防連按。 */
+  if(!hmLock('prodReport:'+item.id))return;
+  hmTx(hmRef('prodReports'),function(d){
+    var all=(d.data&&typeof d.data==='object')?d.data:{};
+    if(!all[item.id])all[item.id]={};
+    all[item.id][curEmp.id]=_rec;
+    d.data=all;return d;
+  }).then(function(){
+    if(!prodReports[item.id])prodReports[item.id]={};
+    prodReports[item.id][curEmp.id]=_rec;
+    return syncReportToERP(item.id,batch,+actual,+extraG||0,item.unit,extraUnit);
+  }).then(function(okErp){
+    alert(okErp===false?'✅ 已填寫（ERP 同步未完成，見上一則提示）':'✅ 已填寫');
+    renderProdWeekView();renderProdToday();
+  }).catch(function(e){alert('⚠ 填寫失敗，資料「沒有」存檔\n\n'+e.message);
+  }).then(function(){hmUnlock('prodReport:'+item.id)},function(){hmUnlock('prodReport:'+item.id)});
 }
 
 function editProdReport(itemId){
   var rpt=prodReports[itemId]?prodReports[itemId][curEmp.id]:null;
   if(!rpt){alert('找不到回報紀錄');return}
-  var item=prodSchedule.find(function(s){return s.id===itemId});
+  var item=prodSchedule.find(function(s){return s.id===itemId})||{};
   var newBatch=prompt('批號：',rpt.batch||'');
   if(newBatch===null)return;
   var newActual=prompt('整數數量（'+item.unit+'）：',rpt.actual);
@@ -1714,18 +1793,25 @@ function editProdReport(itemId){
   var newExtraUnit=prompt('零頭單位（g/支/個/包）：',rpt.extraUnit||'g');
   if(newExtraUnit===null)return;
   
-  rpt.batch=newBatch;
-  rpt.actual=+newActual;
-  rpt.extraG=+newExtraG||0;
-  rpt.extraUnit=newExtraUnit||'g';
-  rpt.editedAt=new Date().toISOString();
-  if(db){
-    db.collection(fbEnv+'_hrdata').doc('prodReports').set({data:prodReports}).then(function(){
-      syncReportToERP(itemId,newBatch,+newActual,rpt.extraG,rpt.unit||item.unit);
-      alert('✅ 已修改');
-      renderProdToday();renderProdWeekView();
-    }).catch(function(e){alert('修改失敗：'+e.message)});
-  }
+  if(!db){alert('尚未連線，無法修改');return}
+  /* [FIX-27] 同 fillPastReport：改交易只寫自己那格、補 extraUnit、防連按；
+     並在寫成功之前不更動記憶體中的 rpt，避免寫入失敗時畫面與雲端不一致。 */
+  var _rec=Object.assign({},rpt,{batch:newBatch,actual:+newActual,extraG:+newExtraG||0,extraUnit:newExtraUnit||'g',editedAt:new Date().toISOString()});
+  if(!hmLock('prodReport:'+itemId))return;
+  hmTx(hmRef('prodReports'),function(d){
+    var all=(d.data&&typeof d.data==='object')?d.data:{};
+    if(!all[itemId])all[itemId]={};
+    all[itemId][curEmp.id]=_rec;
+    d.data=all;return d;
+  }).then(function(){
+    if(!prodReports[itemId])prodReports[itemId]={};
+    prodReports[itemId][curEmp.id]=_rec;
+    return syncReportToERP(itemId,newBatch,+newActual,_rec.extraG,_rec.unit||item.unit,_rec.extraUnit);
+  }).then(function(okErp){
+    alert(okErp===false?'✅ 已修改（ERP 同步未完成，見上一則提示）':'✅ 已修改');
+    renderProdToday();renderProdWeekView();
+  }).catch(function(e){alert('⚠ 修改失敗，資料「沒有」變更\n\n'+e.message);
+  }).then(function(){hmUnlock('prodReport:'+itemId)},function(){hmUnlock('prodReport:'+itemId)});
 }
 
 /* ══ [FIX-17] 舊版有三個問題，而且全部靜默 ══════════════════════
@@ -1799,6 +1885,7 @@ function onDataReady(){
   checkPreLeaveReminder();
   renderOTChoices();
   syncOfflinePunches();
+  syncOfflineLeaves();
   checkNoPunchAlert();
   checkLeaveResult();
   checkSchedChange();
@@ -1961,8 +2048,11 @@ function submitNewHire(){
   var _dup=false;
   hmTx(hmRef('newHireApply'),function(d){
     var list=Array.isArray(d.data)?d.data:[];
-    /* 同一身分證只收一次，避免重複建檔 */
-    if(list.some(function(x){return x&&x.idnum===data.idnum})){_dup=true;return false}
+    /* 同一身分證只收一次，避免重複建檔。
+       [FIX-26] 舊版比對欄位寫成 x.idnum/data.idnum，實際存的是 id_num，兩邊都是
+       undefined → undefined===undefined 恆為 true：第一位送出後，之後每位新人都會
+       被誤判為「已送出過」而完全無法報到。改為比對正確欄位，且 id_num 有值才算重複。 */
+    if(data.id_num&&list.some(function(x){return x&&x.id_num===data.id_num})){_dup=true;return false}
     list.push(data);d.data=list;return d;
   }).then(function(){
     if(_dup){alert('⚠ 這份資料已經送出過了\n\n如需修改，請聯繫店長或老闆。');closeNewHireForm();return}
