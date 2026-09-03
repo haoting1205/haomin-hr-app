@@ -902,7 +902,10 @@ function submitMakeupPunch(){if(!curEmp||!db)return;var date=document.getElement
   if(_md>_t0){alert('⚠ 補打卡不能填未來的日期\n\n只能補登今天或今天以前忘記打的卡。');return}
   if((_t0-_md)>62*86400000){alert('⚠ 只能補登 2 個月內的打卡\n\n更早的紀錄請直接請主管在管理端處理。');return}if(!confirm('確認提交補打卡申請？\n\n日期：'+date+'\n時間：'+time+'\n類型：'+type+'\n原因：'+reason))return;if(!hmLock('submitMakeup'))return;
   var _rec={id:'ma'+Date.now(),eid:curEmp.id,name:curEmp.name,store:curEmp.store||'',date:date,time:time+':00',type:type,reason:reason,status:'待審核',submitDate:new Date().toISOString()};
-  hmTxPush('punchApplies','data',_rec).then(function(){
+  hmTxPushUnique('punchApplies','data',_rec,function(x){
+    return x.eid===_rec.eid&&x.date===_rec.date&&x.time===_rec.time&&x.type===_rec.type&&x.status==='待審核';
+  }).then(function(dup){
+    if(dup){alert('⚠ 同一天同一時間的補打卡申請已經送出過了\n\n正在等待店長審核，不用再送一次。');loadMakeupHistory();return}
     alert('✅ 補打卡申請已提交\n請等待店長審核');
     var _r=document.getElementById('app-makeup-reason');if(_r)_r.value='';
     loadMakeupHistory();
@@ -916,8 +919,14 @@ function loadStoreNotes(){if(!curEmp||!db)return;db.collection(fbEnv+'_hrdata').
 function openAppSwap(){if(!curEmp||!db)return;var h='<div style="font-size:16px;font-weight:700;color:#0f1b35;margin-bottom:12px">🔄 換班申請</div>';h+='<div style="margin-bottom:8px"><span style="font-size:11px;color:#666">換班日期</span><input class="fi" type="date" id="app-swap-date"></div>';h+='<div style="margin-bottom:8px"><span style="font-size:11px;color:#666">想換的對象</span><select class="fi" id="app-swap-target">';staff.forEach(function(e){if(e.id!==curEmp.id&&!e.leave_date)h+='<option value="'+e.id+'">'+e.name+'</option>'});h+='</select></div>';h+='<div style="margin-bottom:8px"><span style="font-size:11px;color:#666">原因</span><input class="fi" id="app-swap-reason" placeholder="換班原因"></div>';h+='<button onclick="submitAppSwap()" style="width:100%;padding:10px;background:#7c3aed;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">📤 提交換班申請</button>';h+='<div id="app-swap-list" style="margin-top:12px"></div>';document.getElementById('screen-swap').innerHTML='<div style="padding:16px">'+h+'</div>';loadAppSwapHistory()}
 function submitAppSwap(){if(!curEmp||!db)return;var date=document.getElementById('app-swap-date').value;var target=document.getElementById('app-swap-target').value;var reason=document.getElementById('app-swap-reason').value;if(!date||!target||!reason){alert('請填寫完整');return}var targetEmp=staff.find(function(x){return x.id===target});/* [FIX-03] 舊版直接讀 targetEmp.name，對象不存在時整個畫面當掉。 */if(!targetEmp){alert('⚠ 找不到換班對象，請重新選擇');return}if(targetEmp.id===curEmp.id){alert('⚠ 不能和自己換班');return}if(!confirm('確認提交換班申請？\n\n日期：'+date+'\n換班對象：'+targetEmp.name+'\n原因：'+reason))return;if(!hmLock('submitSwap'))return;
   var _rec={id:'sw'+Date.now(),fromEid:curEmp.id,fromName:curEmp.name,toEid:target,toName:targetEmp.name,date:date,reason:reason,status:'待審核',submitDate:new Date().toISOString()};
-  hmTxPush('swapRecords','data',_rec).then(function(){
-    alert('✅ 換班申請已提交\n請等待店長審核');loadAppSwapHistory();
+  hmTxPushUnique('swapRecords','data',_rec,function(x){
+    return x.fromEid===_rec.fromEid&&x.toEid===_rec.toEid&&x.date===_rec.date&&x.status==='待審核';
+  }).then(function(dup){
+    if(dup){alert('⚠ 這一天與同一位同事的換班申請已經送出過了\n\n正在等待店長審核，不用再送一次。');loadAppSwapHistory();return}
+    alert('✅ 換班申請已提交\n請等待店長審核');
+    /* 送出成功要清空表單 —— 舊版留著原本填的內容，使用者很自然會再按一次 */
+    ['app-swap-reason','app-swap-date'].forEach(function(i){var e=document.getElementById(i);if(e)e.value=''});
+    loadAppSwapHistory();
   }).catch(function(e){alert('⚠ 提交失敗，申請「沒有」送出\n\n'+e.message);
   }).then(function(){hmUnlock('submitSwap')},function(){hmUnlock('submitSwap')});
 }
@@ -1003,8 +1012,9 @@ function _appPunchFail(e,rec){
 function syncPunchFromFB(){if(!curEmp||!db)return;_readPunchMonths([ymStr()]).then(function(data){var myToday=data.filter(function(r){var now=new Date();var today=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());return r.eid===curEmp.id&&r.date===today});if(myToday.length>0){var local=JSON.parse(localStorage.getItem('hm_app_punch')||'[]');myToday.forEach(function(r){if(!local.find(function(x){return x.id===r.id}))local.push(r)});localStorage.setItem('hm_app_punch',JSON.stringify(local));renderPunchToday()}}).catch(function(){})}
 
 
-var APP_VERSION='3.22.0';
+var APP_VERSION='3.23.0';
 var APP_CHANGELOG=[
+{ver:'3.23.0',date:'2026-09-03',changes:['【修正·換班可以重複送出】送出成功後表單不會清空，使用者很自然會再按一次，主管就收到兩張一模一樣的換班單。現在同一天、同一位對象、還在等審核時不會再收第二張，送出後也會清空表單','【修正·補打卡同樣可以重複送出】同一天同一時間同一類型的補打卡，等待審核期間不會再收第二張','【修正·製作回報打到一半的數字會被清掉】雲端推播或切回前景時整塊畫面會重畫，員工正在輸入的批號與數量會無聲消失、可能重打時打錯。現在重畫會保留已輸入的內容']},
 {ver:'3.22.0',date:'2026-09-02',changes:['【★重大·離線送出的假單永遠不會到主管手上】舊版顯示「假單已暫存」，但那張假單只存在手機裡、沒有任何補送程式 —— 員工以為請好假了，主管一張都沒收到，最後被當成曠職。現在改為：說清楚「還沒送到主管那裡」，並在恢復網路時自動補送（不會重複）','【★薪資頁可能整頁空白或當掉】某個月資料是空的就會讓整個薪資頁掛掉；且新的「每人一份」薪資結構讀不到，會顯示「尚無薪資紀錄」。兩種結構現在都讀得到，缺資料也不會當掉','【安全】劃休截止日（每月10日）改為送出時再驗一次 —— 舊版只是不畫按鈕，頁面開著沒關或換手機仍送得出去；並改為同一人同一個月只能有一張，避免店長收到兩份衝突的劃休','【修正】主管核准補打卡時若打卡寫入失敗，單子會停在「已核准」卻沒有打卡紀錄，而且因為是終結狀態再也按不了。現在改為自動退回「待審核」，可以真的重試','【修正】假單月份改為跟著假單起始日；舊版跟著「班表頁當下在看第幾月」，先翻月份再請假就會歸錯月，管理端篩選找不到','【修正】帳號沒綁員工時開啟劃休頁會整頁當掉','【修正】統一密碼加鹽方式，避免日後啟用強雜湊時改過密碼的人登不進來']},
 {ver:'3.21.0',date:'2026-09-02',changes:['【★重大·新人報到只有第一位送得出去】重複判斷比對到不存在的欄位，第一位新人送出後，之後每一位都被誤判為「已送出過」而完全無法報到。已修正為比對正確的身分證欄位','【★製作補填/修改會吃掉同事的回報】「過去補填」與「修改回報」兩支仍用整包覆寫雲端（先前只修了即時回報那一支），多人同時回報會互相蓋掉；且同步到 ERP 時漏傳零頭單位，一律被記成 g。已改為交易只寫自己那格、補回單位、並防連按重複送出','【修正·清晨顯示昨天】「今日出勤」「今日生產排程」等改用手機本地日期計算；舊版用世界時計算，台灣清晨 0～8 點會顯示前一天、把早班同仁全列為未打卡']},
 {ver:'3.20.0',date:'2026-09-01',changes:['【★重大·打卡沒上傳成功不再靜默】程式一直在找一個「待同步」提示條，但那個元素根本不存在，所以打卡沒送上雲端時員工只看到「打卡成功」、完全沒有提示。現在改為：打卡結果會明確顯示「已上傳雲端」或「尚未上傳，已暫存手機」，畫面上方也會出現可點擊重送的橘色提示條','【★安全·還在用預設密碼者強制修改】舊版只是「建議」修改，按取消就能繼續用。預設密碼是工號+aa、工號在班表上看得到 —— 等於沒有密碼。現在必須設定新密碼才能使用，連續不設定會自動登出','【安全】薪資改為優先讀取「每人一份」的新結構；管理端改寫入該結構後，員工就再也拿不到別人的薪資資料','【安全】Firestore 規則改版：以「匿名登入（員工APP）vs Google 帳號（管理端）」分權，員工端不能寫員工主檔／班表／薪資，新人報到資料改為可寫不可讀，成本與勾稽資料員工端完全禁止']},
@@ -1208,6 +1218,19 @@ function hmTx(ref,mutate){
       t.set(ref,out||data);
     });
   });
+}
+/* [FIX-36] 「同一張申請不可重複送出」原本各功能各寫一份 —— 劃休修好了，
+   換班與補打卡卻還是「按一次送一張」。送出成功後鎖就放開，使用者再按一次
+   就會多一張，主管會看到兩張一模一樣的單。集中成這一支，共用。
+   dup(x) 回傳 true 代表已有等效的單，就不再寫入。 */
+function hmTxPushUnique(docName,listKey,rec,isDup){
+  var dup=false;
+  return hmTx(hmRef(docName),function(d){
+    var list=Array.isArray(d[listKey])?d[listKey]:[];
+    if(list.some(function(x){return x&&x.id===rec.id})){dup=true;return false}
+    if(isDup&&list.some(function(x){return x&&isDup(x)})){dup=true;return false}
+    list.push(rec);d[listKey]=list;return d;
+  }).then(function(){return dup});
 }
 /* 把一筆紀錄安全地加進某份文件的陣列裡 */
 function hmTxPush(docName,listKey,rec){
@@ -1613,6 +1636,18 @@ function checkShowProdTab(){
 }
 function renderProdToday(){
   if(!curEmp)return;
+  /* [FIX-37] 這支會被雲端推播(onSnapshot)與切回前景(visibilitychange)自動呼叫，
+     整塊 innerHTML 重畫 —— 員工正在打的批號／數量會被清空，而且沒有任何提示，
+     很可能重打時打錯。重繪前先記下已輸入的內容，重繪後放回去。 */
+  var _keep={};
+  try{
+    document.querySelectorAll('#prod-today input[id^="prod-"]').forEach(function(el){
+      if(el.value!=='')_keep[el.id]=el.value;
+    });
+    document.querySelectorAll('#prod-today select[id^="prod-"]').forEach(function(el){
+      _keep[el.id]=el.value;
+    });
+  }catch(e){}
   var today=todayStr();
   var items=prodSchedule.filter(function(s){return s.date===today&&s.status!=='已取消'});
   var h='';
@@ -1649,6 +1684,8 @@ function renderProdToday(){
     }
   }
   document.getElementById('prod-today').innerHTML=h;
+  /* [FIX-37] 把重繪前已輸入的內容放回去 */
+  try{Object.keys(_keep).forEach(function(id){var el=document.getElementById(id);if(el&&el.value==='')el.value=_keep[id]})}catch(e){}
   items.forEach(function(item2,ii2){
     var btn=document.getElementById('prod-btn-'+ii2);
     if(btn){(function(idx,itemId){btn.onclick=function(){reportProdItem(itemId,idx)}})(ii2,item2.id)}
