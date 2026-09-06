@@ -703,6 +703,17 @@ db.collection(fbEnv+'_hrdata').doc('payHistory').get().then(function(d){
     else{payHistory={}}
   }
 }).catch(function(){});
+/* [v3.29.0] 老闆／店長寫在排班格上的當日備註（例：醃雞丁、送貨）原本只存在管理端，
+   員工在 APP 上完全看不到 —— 尤其跨店支援時，人被派去別家店卻不知道要做什麼。
+   這裡把備註讀進來，並且只取自己的那一份（與薪資、支援薪資的處理方式一致）。 */
+db.collection(fbEnv+'_hrdata').doc('empDayNote').get().then(function(d){
+  if(d.exists&&d.data().data){
+    var _raw=d.data().data,_me=(curAcct&&curAcct.empId)||(curEmp&&curEmp.id);
+    if(hmRole()==='老闆'||!_me){appDayNote=_raw}
+    else{appDayNote={};if(_raw[_me])appDayNote[_me]=_raw[_me]}
+    try{if(document.getElementById('sched-list'))renderSched()}catch(e){}
+  }
+}).catch(function(){});
 db.collection(fbEnv+'_hrdata').doc('supportPay').get().then(function(d){
   if(d.exists&&d.data().data){
     var _raw=d.data().data,_me=(curAcct&&curAcct.empId)||(curEmp&&curEmp.id),_out={};
@@ -879,7 +890,19 @@ function changeMonth(d){viewM+=d;if(viewM>12){viewM=1;viewY++}if(viewM<1){viewM=
 function _renderSchedCurrentView(){if(schedViewMode==='store')renderSchedStore();else renderSched()}
 function loadViewSched(){_viewSched=null;_renderSchedCurrentView();if(!db)return;db.collection(fbEnv+'_schedules').doc((viewY+1911)+'-'+pad(viewM)).get().then(function(s){_viewSched=s.exists?(s.data().data||{}):{};_renderSchedCurrentView()}).catch(function(){})}
 
-function renderSched(){document.getElementById('sched-month').textContent='民國'+viewY+'年'+viewM+'月';if(!curEmp){document.getElementById('sched-list').innerHTML='<div style="text-align:center;padding:20px;color:var(--gray4)">未綁定員工</div>';return}var D=new Date(viewY+1911,viewM,0).getDate();var h='';var SRC=(_viewSched!==null)?_viewSched:sched;for(var d=1;d<=D;d++){var dt=new Date(viewY+1911,viewM-1,d);var dw=dt.getDay();var key=(viewY+1911)+'-'+pad(viewM)+'-'+pad(d);var sc=SRC[curEmp.id]?SRC[curEmp.id][key]:null;var isWknd=dw===0||dw===6;var dayColor=isWknd?'#991b1b':'var(--gray6)';h+='<div class="sched-day" style="'+(isWknd?'background:#fff5f5;border-radius:8px;padding:10px;margin:-2px -4px':'')+'"><span class="day" style="color:'+dayColor+'">'+viewM+'/'+d+'<br><span style="font-size:11px;color:var(--gray4)">('+DOW[dw]+')</span></span>';if(sc&&LEAVE.indexOf(sc.type)>=0){var lc=sc.type==='例假'?'#166534':sc.type==='特休'?'#0e7490':sc.type==='事假'?'#991b1b':'#6d28d9';h+='<span class="leave" style="color:'+lc+'">'+sc.type+'</span>'}else if(sc&&sc.type==='restOT'){h+='<span class="leave" style="color:#1e40af">🌙休息日加班 '+fT(sc.sh,sc.sm)+'-'+fT(sc.eh,sc.em)+'</span>'}else if(sc){h+='<span class="time">'+fT(sc.sh,sc.sm)+' - '+fT(sc.eh,sc.em)+(sc.store&&sc.store!==curEmp.store?' <span style="font-size:10px;background:#7c3aed;color:#fff;padding:1px 6px;border-radius:4px;margin-left:4px">'+sc.store+'</span>':'')+'</span>'}else if(dw===0){h+='<span class="leave" style="color:#166534">例假</span>'}else if(curEmp){h+='<span class="time">'+fT(curEmp.sh||9,curEmp.sm||0)+' - '+fT(curEmp.eh||17,curEmp.em||0)+'</span>'}h+='</div>'}document.getElementById('sched-list').innerHTML=h}
+function renderSched(){document.getElementById('sched-month').textContent='民國'+viewY+'年'+viewM+'月';if(!curEmp){document.getElementById('sched-list').innerHTML='<div style="text-align:center;padding:20px;color:var(--gray4)">未綁定員工</div>';return}var D=new Date(viewY+1911,viewM,0).getDate();var h='';var SRC=(_viewSched!==null)?_viewSched:sched;for(var d=1;d<=D;d++){var dt=new Date(viewY+1911,viewM-1,d);var dw=dt.getDay();var key=(viewY+1911)+'-'+pad(viewM)+'-'+pad(d);var sc=SRC[curEmp.id]?SRC[curEmp.id][key]:null;var isWknd=dw===0||dw===6;var dayColor=isWknd?'#991b1b':'var(--gray6)';h+='<div class="sched-day" style="'+(isWknd?'background:#fff5f5;border-radius:8px;padding:10px;margin:-2px -4px':'')+'"><span class="day" style="color:'+dayColor+'">'+viewM+'/'+d+'<br><span style="font-size:11px;color:var(--gray4)">('+DOW[dw]+')</span></span>';if(sc&&LEAVE.indexOf(sc.type)>=0){var lc=sc.type==='例假'?'#166534':sc.type==='特休'?'#0e7490':sc.type==='事假'?'#991b1b':'#6d28d9';h+='<span class="leave" style="color:'+lc+'">'+sc.type+'</span>'}else if(sc&&sc.type==='restOT'){h+='<span class="leave" style="color:#1e40af">🌙休息日加班 '+fT(sc.sh,sc.sm)+'-'+fT(sc.eh,sc.em)+'</span>'}
+  /* [v3.29.0] 支援班原本落到最後那個 else，顯示成一般班次 —— 只有一個小小的門市標籤，
+     員工不容易發現「這天要去別家店」。改成明確標示，並帶出時薪。 */
+  else if(sc&&sc.type==='support'){
+    var _sr=(sc.mode!=='overtime'&&sc.rate>0)?(' · '+sc.rate+'元/時'):'';
+    h+='<span class="time" style="color:#0f766e;font-weight:700">🤝 支援 '+hmEsc(sc.store||'')+'　'+fT(sc.sh,sc.sm)+' - '+fT(sc.eh,sc.em)+_sr+'</span>';
+  }
+  else if(sc){h+='<span class="time">'+fT(sc.sh,sc.sm)+' - '+fT(sc.eh,sc.em)+(sc.store&&sc.store!==curEmp.store?' <span style="font-size:10px;background:#7c3aed;color:#fff;padding:1px 6px;border-radius:4px;margin-left:4px">'+hmEsc(sc.store)+'</span>':'')+'</span>'}else if(dw===0){h+='<span class="leave" style="color:#166534">例假</span>'}else if(curEmp){h+='<span class="time">'+fT(curEmp.sh||9,curEmp.sm||0)+' - '+fT(curEmp.eh||17,curEmp.em||0)+'</span>'}/* [v3.29.0] 顯示老闆／店長寫在那一天的工作備註（跨店支援時最重要：去了要做什麼） */
+  try{
+    var _dn=(appDayNote&&curEmp&&appDayNote[curEmp.id]&&appDayNote[curEmp.id][key])||'';
+    if(_dn)h+='<div style="flex:1 1 100%;margin-top:4px;font-size:12px;color:#92400e;background:#fef3c7;border-radius:6px;padding:4px 8px">📝 '+hmEsc(_dn)+'</div>';
+  }catch(e){}
+  h+='</div>'}document.getElementById('sched-list').innerHTML=h}
 
 function submitLeave(){if(!curEmp){alert('未綁定員工');return}var type=document.getElementById('al-type').value;var start=document.getElementById('al-start').value;var end=document.getElementById('al-end').value;var reason=document.getElementById('al-reason').value;var unit=document.getElementById('al-unit').value;if(!start||!end){alert('請選擇日期');return}/* [FIX-02] 舊版沒有檢查前後順序，反向區間會被 Math.max(1,…) 硬算成 1 天而照樣送出。 */var _ds=new Date(start),_de=new Date(end);if(isNaN(_ds.getTime())||isNaN(_de.getTime())){alert('日期格式不正確');return}if(_de<_ds){alert('⚠ 結束日不可早於開始日\n\n開始：'+start+'\n結束：'+end);return}if(!reason){alert('請填寫事由');return}var _span=Math.round((_de-_ds)/(24*60*60*1000))+1;if(unit==='半天'&&_span>1){alert('⚠ 半天假只能申請單一日期');return}var days=unit==='半天'?0.5:_span;/* [FIX-30] 舊版 month 取「班表頁當下在看第幾月」，員工先翻到別的月份再請假，
      假單就會被歸到錯的月份，管理端按月份篩選就找不到。改為跟著假單起始日。 */
@@ -1277,8 +1300,10 @@ function _appPunchFail(e,rec){
 function syncPunchFromFB(){if(!curEmp||!db)return;_readPunchMonths([ymStr()]).then(function(data){var myToday=data.filter(function(r){if(!r)return false;var now=new Date();var today=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());return r.eid===curEmp.id&&r.date===today});if(myToday.length>0){var local=JSON.parse(localStorage.getItem('hm_app_punch')||'[]');myToday.forEach(function(r){if(!local.find(function(x){return x.id===r.id}))local.push(r)});localStorage.setItem('hm_app_punch',JSON.stringify(local));renderPunchToday()}}).catch(function(){})}
 
 
-var APP_VERSION='3.29.0';
+var APP_VERSION='3.30.0';
 var APP_CHANGELOG=[
+{ver:'3.30.0',date:'2026-09-06',changes:['【★修正·補打卡核准後，錯的那筆還在】老闆回報「員工若打卡錯誤，使用補打卡功能無法覆蓋原有紀錄」。查下來：員工自己按打卡的那條路徑早就有覆蓋機制（會問要不要覆蓋、把舊的標記作廢），但「補打卡申請核准」這條完全沒有 —— 核准後只是再加一筆，同一天同一種卡變成兩筆，錯的那筆還在。之後遲到分鐘、工時、全勤判定會以先找到的那一筆為準，也就是錯的那筆。已改為核准時先把同一天同一種的舊紀錄標記作廢（不實體刪除，雲端仍查得到軌跡），再寫入新的，並在成功訊息中告知原本那筆幾點被作廢。人資系統端（v4.9.13）同步修正，兩邊用同一套規則。']},
+{ver:'3.29.1',date:'2026-09-06',changes:['【★修正·支援班在APP上看起來就是一般班】老闆問「選擇支援，員工APP 看得到需要支援的排班嗎？」。實測：時間看得到、支援門市也有一個小紫標籤，但整格是走「一般班次」那條分支顯示的 —— 沒有「支援」兩個字，員工很容易以為是自己店的班。已改為明確顯示「🤝 支援 ○○店　時間」，並在時薪／固定時薪模式時帶出時薪。','【★新增·排班備註終於看得到】老闆與店長寫在排班格上的當日備註（例：醃雞丁、送貨）原本只存在管理端，APP 完全沒有讀這份資料（empDayNote），員工看不到。跨店支援時最要命 —— 人被派去別家店，卻不知道要做什麼。已改為載入並在該日班次下方以黃色標籤顯示，且只讀取自己的那一份（與薪資、支援薪資相同的隱私處理）。','【致謝·併版】本版建立在 v3.29.0 之上。v3.29.0 攔下了我在 v3.28.0 引入的一個嚴重錯誤：登入前等待匿名驗證時，旗標在重新呼叫 appLogin() 之前就被歸零，造成微任務無限迴圈，APP 會在登入時整個凍結。已重新實測確認：v3.28.0 重入超過 500 次後爆掉，v3.29.0 只重入 2 次後正常完成。']},
 {ver:'3.29.0',date:'2026-09-06',changes:[
 '【併版】本版已把另一份平行開發的 v3.26.0～v3.28.0 全部修正併入：密碼重設申請被當成補打卡核准（會建出 time=undefined 的髒紀錄）、匿名登入時序（收緊 Firestore 規則的前置條件）、今日交接事項與補休到期日的時區問題。其中補休到期日本版修得更完整（對方的做法在月底仍會算錯，8/31 加 6 個月會變成 3/3 而不是 2/28）',
 '【★併版時攔下一個會讓 APP 完全登不進去的錯】另一份 v3.28.0 的驗證等待寫成「旗標在重新呼叫登入前就歸零」，等於每次重入都再等一次已完成的驗證，形成微任務無限循環 —— 事件迴圈被餓死，APP 在登入畫面凍結、按什麼都沒反應。實測兩邊檔案都卡死超過 170 秒。本版已修正（旗標等到了就保持設定，登出時才重置）',
@@ -1446,6 +1471,7 @@ function verifyPass(plain,hashed,salt){
 }
 
 
+var appDayNote={};
 var offlinePunchQueue=[];
 try{offlinePunchQueue=JSON.parse(localStorage.getItem('hm_offline_punch')||'[]')}catch(e){}
 
@@ -1774,9 +1800,27 @@ function mgrApproveMakeup(id){
       var x=null;for(var i=0;i<list.length;i++){if(list[i]&&list[i].id===id){x=list[i];break}}
       if(!x)return false;mut(x);x.updatedAt=new Date().toISOString();d.data=list;return d;
     }).catch(function(){})}
-    return _punchDocOf(r.date).set({data:firebase.firestore.FieldValue.arrayUnion(prec),ym:_appPmk(r.date),updated:new Date().toISOString()},{merge:true})
+    /* [FIX v3.30.0 ★] 老闆回報「員工打卡錯誤，用補打卡無法覆蓋原有紀錄」。
+       舊版核准後只是「再加一筆」，錯的那筆還在，同一天同一種卡會變成兩筆，
+       之後遲到分鐘、工時、全勤判定都會以錯的那筆為準。
+       這裡先把同一天同一種的舊紀錄標記作廢再寫新的（不實體刪除，雲端仍查得到軌跡）。
+       作廢是用 arrayUnion 追加同 id 的新版本，合併時後到的會蓋掉先到的，
+       與人資系統 doPunch／voidDupPunch 的作法一致。 */
+    var _voidOld=function(){
+      return _punchDocOf(r.date).get().then(function(_d){
+        var _arr=(_d.exists&&_d.data()&&_d.data().data)||[];
+        var _dups=_arr.filter(function(x){return x&&!x.void&&x.eid===r.eid&&x.date===r.date&&x.type===r.type});
+        if(!_dups.length)return null;
+        window.__mkVoided=_dups.map(function(x){return String(x.time||'').substring(0,5)}).join('、');
+        var _vs=_dups.map(function(x){return Object.assign({},x,{void:1,voidAt:new Date().toISOString(),
+          voidBy:(curAcct&&curAcct.user)||'',voidReason:'被補打卡申請覆蓋'})});
+        return _punchDocOf(r.date).set({data:firebase.firestore.FieldValue.arrayUnion.apply(null,_vs),ym:_appPmk(r.date),updated:new Date().toISOString()},{merge:true});
+      }).catch(function(){return null});
+    };
+    window.__mkVoided='';
+    return _voidOld().then(function(){return _punchDocOf(r.date).set({data:firebase.firestore.FieldValue.arrayUnion(prec),ym:_appPmk(r.date),updated:new Date().toISOString()},{merge:true})})
       .then(function(){return _mkStamp(function(x){x.punchWritten=true}).then(function(){
-        alert('✅ 打卡紀錄已寫入 '+r.date+' '+r.time);loadMgrApprove()})})
+        alert('✅ 打卡紀錄已寫入 '+r.date+' '+r.time+(window.__mkVoided?('\n\n原本的「'+r.type+' '+window.__mkVoided+'」已標記作廢，只留這一筆。'):''));loadMgrApprove()})})
       .catch(function(e){return _mkStamp(function(x){x.status='待審核';x.punchWritten=false;x.lastError='打卡寫入失敗：'+e.message}).then(function(){
         alert('⚠ 打卡紀錄寫入失敗：'+e.message+'\n\n這張單已「退回待審核」，網路正常後再核准一次即可（不會重複寫入）。');loadMgrApprove()})});
   }).then(function(){hmUnlock('apprMk:'+id)},function(){hmUnlock('apprMk:'+id)});
