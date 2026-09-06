@@ -1030,8 +1030,9 @@ function _appPunchFail(e,rec){
 function syncPunchFromFB(){if(!curEmp||!db)return;_readPunchMonths([ymStr()]).then(function(data){var myToday=data.filter(function(r){var now=new Date();var today=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());return r.eid===curEmp.id&&r.date===today});if(myToday.length>0){var local=JSON.parse(localStorage.getItem('hm_app_punch')||'[]');myToday.forEach(function(r){if(!local.find(function(x){return x.id===r.id}))local.push(r)});localStorage.setItem('hm_app_punch',JSON.stringify(local));renderPunchToday()}}).catch(function(){})}
 
 
-var APP_VERSION='3.26.0';
+var APP_VERSION='3.27.0';
 var APP_CHANGELOG=[
+{ver:'3.27.0',date:'2026-09-06',changes:['【★資料污染·密碼重設申請會被當成補打卡核准】密碼重設申請與補打卡申請寫在同一份 punchApplies，前者沒有 time 也沒有 type。主管審核清單原本只用 status==="待審核" 過濾，兩種單混在一起；核准後會建出 time="undefined:00" 的髒打卡紀錄，之後遲到分鐘與工時會變成 NaN。已修正：清單把非補打卡的申請獨立成一區、不給核准鈕，核准流程再擋一次單別與必要欄位。人資系統端（v4.9.8）同步修正。']},
 {ver:'3.26.0',date:'2026-09-05',changes:['【★時區·凌晨時段所有日期都會少一天】程式裡有兩處用 new Date().toISOString().substring(0,10) 當成「今天」。toISOString() 給的是 UTC，台灣是 UTC+8，所以每天 00:00~07:59 這個時段它回傳的是「昨天」。台積電店 02:00 開店，整個早班都落在這個區間 —— 早班同仁打開 APP 看到的「今日交接事項」，一直都是前一天的那一份。補休到期日（申請日 +6 個月）也可能算成前一天。已改用本地日期函式 hmDate()。打卡本身原本就是用本地寫法，日期是正確的，不受影響。','【同步·人資系統 v4.9.6】人資系統原本要把密碼雜湊換成 SHA-256、也用 hm2$ 當前綴，會與本 APP 既有的 hm2$（_hashStrong，96 位元、12000 輪、以帳號名稱當鹽）撞在一起 —— 只要有人在人資系統改過密碼，就會登不進這支 APP。已改為人資系統直接採用本 APP 這一套，兩端逐位元相同，並實測交叉驗證通過。本 APP 的雜湊程式碼未更動。']},
 {ver:'3.25.0',date:'2026-09-03',changes:['【★重大·兩個人在同一毫秒送出，其中一張會安靜地不見】所有單據編號都是「前綴＋當下毫秒」，兩位不同員工同時送出（交接時段一起打卡、或網路恢復後多筆一起補送）會拿到完全相同的編號；而防重複的機制是「編號一樣就當成重複丟掉」—— 結果其中一位看到「✅ 已送出」，雲端卻沒有他那一張。假單、劃休、換班、補打卡、打卡、新人報到全部受影響。編號改為「毫秒＋員工編號＋亂數」，不同人不可能再撞在一起']},
 {ver:'3.24.0',date:'2026-09-03',changes:['【★安全·員工填的文字會變成主管畫面上的程式碼】假單事由、補打卡原因、交接事項等欄位原本直接拼進畫面。員工只要在事由欄填一段網頁碼，就會在「店長／老闆的審核畫面」上變成真的元素 —— 等於一般員工可以影響權限最高的人看到的畫面。現在所有使用者填寫的文字一律先轉成純文字再顯示（交接事項的換行仍正常）','【修正】三筆舊版版本紀錄(v3.6～v3.8)格式與其他筆不同，先前曾害「版本紀錄」整個打不開。已把資料本身改成一致格式，移除這顆未爆彈','【修正】事由含引號不會再撐壞版面；超長文字也不會讓畫面當掉']},
@@ -1376,7 +1377,20 @@ function loadMgrApprove(){
     // Makeup punch
     return db.collection(fbEnv+'_hrdata').doc('punchApplies').get();
   }).then(function(doc){
-    var mas=(doc.exists?doc.data().data||[]:[]).filter(function(r){return r.status==='待審核'});
+    var _all=(doc.exists?doc.data().data||[]:[]);
+    /* [FIX v3.27.0 ★] 密碼重設申請也寫在同一份 punchApplies（kind:'密碼重設'），
+       它沒有 time 也沒有 type。混進補打卡清單被核准，會建出 time='undefined:00' 的
+       髒打卡紀錄，之後遲到分鐘與工時會變成 NaN。 */
+    var mas=_all.filter(function(r){return r.status==='待審核'&&(!r.kind||r.kind==='補打卡')});
+    var _other=_all.filter(function(r){return r.status==='待審核'&&r.kind&&r.kind!=='補打卡'});
+    if(_other.length){
+      h+='<div style="font-size:13px;font-weight:700;color:#92400e;margin:10px 0 6px">🔑 其他申請（請老闆到人資系統的「帳號管理」處理，不能在這裡核准）</div>';
+      _other.forEach(function(r){
+        h+='<div style="padding:8px;background:#fef3c7;border-radius:8px;margin-bottom:6px;font-size:12px">'
+          +'<b>'+hmEsc(r.name||'')+'</b> ｜ '+hmEsc(r.kind||'')+' ｜ '+hmEsc(r.date||'')
+          +'<div style="color:#666;margin-top:2px">'+hmEsc(r.reason||'')+'</div></div>';
+      });
+    }
     if(mas.length>0){
       h+='<div style="font-size:13px;font-weight:700;color:#166534;margin:10px 0 6px">📋 補打卡 ('+mas.length+')</div>';
       mas.forEach(function(r){
@@ -1413,6 +1427,12 @@ function mgrApproveMakeup(id){
   if(!hmLock('apprMk:'+id))return;
   hmSetStatus({doc:'punchApplies',listKey:'data',id:id,status:'已核准',okMsg:'✅ 已核准，正在寫入打卡紀錄…'}).then(function(r){
     if(!r){hmUnlock('apprMk:'+id);return}
+    /* [FIX v3.27.0 ★] 最後一道防線：密碼重設等非補打卡單沒有 time／type，
+       照樣建打卡紀錄會產生 time='undefined:00' 的髒資料。 */
+    if((r.kind&&r.kind!=='補打卡')||!r.date||!r.time||!r.type){
+      alert('這張單不是完整的補打卡申請（缺日期／時間／類型，或屬於其他申請類別），沒有建立打卡紀錄。');
+      hmUnlock('apprMk:'+id);return;
+    }
     var prec={id:'p'+id,eid:r.eid,name:r.name,store:r.store,date:r.date,time:r.time,type:r.type,gps:'補打卡(APP)',makeupOf:id,ts:new Date().toISOString()};
     /* [FIX-35] 舊版：狀態已改成「已核准」但打卡沒寫進去。「已核准」是終結狀態，
        再按一次會被 hmSetStatus 擋掉 —— 提示說「請再按一次核准」其實做不到，
