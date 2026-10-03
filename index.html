@@ -249,7 +249,7 @@ body{font-family:'Noto Sans TC',sans-serif;background:#eef2f7;color:var(--gray6)
 <div class="screen" id="screen-sop">
 <div style="padding:16px;font-size:12px;line-height:1.8;color:#333">
 <div style="font-size:18px;font-weight:700;color:#0f1b35;margin-bottom:4px">📖 員工操作手冊</div>
-<div style="font-size:11px;color:#888;margin-bottom:16px">好洺餐飲事業有限公司 員工APP操作SOP　<span id="sop-ver">v3.33.0</span>　<span style="color:#b45309">（本手冊已與 v3.33.0 實際功能核對）</span></div>
+<div style="font-size:11px;color:#888;margin-bottom:16px">好洺餐飲事業有限公司 員工APP操作SOP　<span id="sop-ver">v3.34.0</span>　<span style="color:#b45309">（本手冊已與 v3.34.0 實際功能核對）</span></div>
 
 <div style="background:#166534;color:#fff;padding:8px 12px;border-radius:6px;font-weight:700;font-size:13px;margin-bottom:6px">📱 介面導覽（新版）</div>
 <div style="padding:4px 8px 12px">
@@ -343,7 +343,7 @@ body{font-family:'Noto Sans TC',sans-serif;background:#eef2f7;color:var(--gray6)
 <div style="padding:4px 8px 12px">
 • 點「💰 薪資」查看每月薪資明細<br>
 • 顯示：本薪+津貼+加班費-勞保-健保-所得稅=實發<br>
-• 發薪日：每月10日（遇假日提前）<br>• 🤝 若您有跨店支援(以時薪計酬)，薪資頁下方會另外顯示「跨店支援時薪」明細與小計（本店月薪之外的額外工資；勞健保不重複扣、所得稅併入主單）<br>• 🛒 叫貨：首頁點「叫貨」→ 系統自動帶出您門市的叫貨連結，按「立即叫貨」開啟；也可從各店清單選擇其他門市叫貨
+• 發薪日：每月10日（遇假日提前）<br>• 🤝 若您有跨店支援(以時薪計酬)，薪資頁下方會另外顯示「跨店支援時薪」明細與小計（本店月薪之外的額外工資；勞健保不重複扣、所得稅併入主單）<br><span style="color:#0f766e">　<b>支援那天怎麼算（v3.34.0 補充）</b>：<br>　• <b>整天都去別店支援</b>（班表只有一條青色 🤝 支援）→ 那天<b>不算本店工時</b>，整天的錢由支援門市以「時數 × 支援時薪」計算。<b>兼職同仁</b>那天本店是 0 元，不是漏算，而是改由支援門市付。<br>　• <b>本店上半天、下半天去支援</b>（班表有兩條）→ 本店那段照本店算、支援那段另外算，兩段都領得到。<br>　• 支援時薪是公司事先設定的，與本店時薪可能不同；金額會顯示在班表那一條青色支援列上，發薪前就看得到。</span><br>• 🛒 叫貨：首頁點「叫貨」→ 系統自動帶出您門市的叫貨連結，按「立即叫貨」開啟；也可從各店清單選擇其他門市叫貨
 </div>
 
 <div style="background:#dc2626;color:#fff;padding:8px 12px;border-radius:6px;font-weight:700;font-size:13px;margin-bottom:6px">七、修改密碼 / 忘記密碼</div>
@@ -1405,8 +1405,9 @@ function _appPunchFail(e,rec){
 function syncPunchFromFB(){if(!curEmp||!db)return;_readPunchMonths([ymStr()]).then(function(data){var myToday=data.filter(function(r){if(!r)return false;var now=new Date();var today=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());return r.eid===curEmp.id&&r.date===today});if(myToday.length>0){var local=JSON.parse(localStorage.getItem('hm_app_punch')||'[]');myToday.forEach(function(r){if(!local.find(function(x){return x.id===r.id}))local.push(r)});localStorage.setItem('hm_app_punch',JSON.stringify(local));renderPunchToday()}}).catch(function(){})}
 
 
-var APP_VERSION='3.33.0';
+var APP_VERSION='3.34.0';
 var APP_CHANGELOG=[
+{ver:'3.34.0',date:'2026-10-03',changes:['【本版來源】配合人資系統 v4.9.19 對「跨店支援如何計薪」的釐清，補上員工端看得懂的說明。','【SOP 補充·支援那天的薪水怎麼算】「六、查看薪資」新增三點：①整天都去別店支援 → 那天不算本店工時，整天由支援門市以 時數×支援時薪 計算；兼職同仁那天本店是 0 元，不是漏算，而是改由支援門市付。②本店上半天、下半天去支援 → 兩段分別計算，都領得到。③支援時薪是公司事先設定、與本店時薪可能不同，金額會顯示在班表那一條青色支援列上，發薪前就看得到。','【未改·功能完全沒動】本版只補手冊文字，沒有改任何程式邏輯或畫面行為。']},
 {ver:'3.33.0',date:'2026-10-03',changes:['【本版來源】與人資系統 v4.9.18 同一個根因。老闆回報「10月才報到的新人為什麼會顯示在過去的月份」。','【★修正·到職前的月份會顯示整個月的假班表】APP 在「這一天沒有排班資料」時，會自動顯示員工的預設上下班時間。新人往前翻月份時，那些月份本來就沒有任何排班 —— 結果整個月（扣掉週日）每一天都顯示 09:00 - 17:00，新人會誤以為自己那時候就該上班。已改為：到職前與離職後的日子顯示「—」，不再補假班表。','【實測】10/1 到職的員工翻看 115年8月與9月：修正前各顯示 26 天假班表，修正後 0 天；10月（到職當月）照常顯示 27 天，不受影響。','【判斷邊界】到職當天算在職、離職當天算在職；沒有填到職日的人行為與舊版完全相同。','【SOP 同步】員工手冊「三、查看班表」補上說明：到職前的月份不會有班，那是正常的。']},
 {ver:'3.32.0',date:'2026-10-03',changes:['【本版來源】老闆 2026-10-03 回報「支援班表無法顯示在員工APP內」。','【★★ 根因·支援班完全看不到】支援資料有兩種形狀：Ａ整格就是支援（type:support）、Ｂ支援附掛在本店班上（sup:{…}）。實際雲端資料幾乎都是Ｂ，而本APP 全檔搜尋 .sup 的結果是「0 次」—— 只認得Ａ，Ｂ一律落到「一般班次」，員工只看到本店的上下班時間，完全不知道那天要去別家店。新增統一解讀函式 _supOf()，兩種形狀都認得，各頁一律改用它。','【★修正·我的班表】整格支援＝顯示青色「🤝 支援【門市】時間　時薪」；本店班＋支援段＝本店時間照顯示，下面另加一條青色支援列（兩段都要上，不是二選一）。時間格式與該頁其他班次統一為 09:00 - 17:00。','【★★修正·門市班表看不到有人要來支援】範圍判斷原本只看「員工主要門市」與「格子的 store」，而支援門市寫在 sup.store —— A店的人去支援B店時，B店同仁與店長根本看不到有人要來。已修正：被支援門市顯示「🤝時間（○○店來支援）」；原門市在該員本店班後面標「→支援○○店」，店長看得出人力缺口。另修正整格支援時 sc.store 存的是「支援去哪一家」而非他自己的店，不可當作「屬於這家店」的依據。','【新增·支援當天的打卡防呆】打卡頁當天跳青色提示「🤝今天要支援【門市】時間」，提醒到那邊打卡前先把門市切過去、回本店再切回來；整天都是支援時自動帶好門市。門市選錯會把出勤記到別家店，薪資與該店人事成本都會跟著錯。','【驗證】兩種資料形狀 × 三種視角（本人班表／被支援門市／原門市）全部實測通過；node --check 三個 script 區塊皆通過；既有 APP 測試（appsched、apptest、apprscan、looptest）全數通過，無載入錯誤。','【SOP 同步】員工手冊「三、查看班表」新增「🤝去別家店支援的班」完整四點（我的班表／門市班表／打卡門市務必切換／工作備註），並補充可用 ◀▶ 翻看下個月；「四、劃休申請」補上審核範圍說明（自己門市店長，支援期間該店店長也看得到）。']},
 {ver:'3.31.0',date:'2026-09-06',changes:[
