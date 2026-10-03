@@ -176,7 +176,7 @@ body{font-family:'Noto Sans TC',sans-serif;background:#eef2f7;color:var(--gray6)
 <div class="card">
 <div class="punch-clock" id="p-clock">--:--:--</div>
 <div class="punch-date" id="p-date">──</div>
-<div style="margin-bottom:10px"><span style="font-size:11px;font-weight:700;color:#666">選擇打卡門市</span><select class="fi" id="p-store" onchange="getGPS()" style="font-size:15px;padding:10px"><option value="">請選擇門市</option></select></div><div class="gps-status" id="p-gps">📍 定位中...</div>
+<div style="margin-bottom:10px"><span style="font-size:11px;font-weight:700;color:#666">選擇打卡門市</span><select class="fi" id="p-store" onchange="getGPS();hmUpdateStoreWarn();try{_supPunchHint()}catch(e){}" style="font-size:15px;padding:10px"><option value="">請選擇門市</option></select><div id="p-store-warn" style="display:none;margin-top:6px;padding:8px 10px;background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;font-size:12px;color:#92400e;line-height:1.6"></div></div><div class="gps-status" id="p-gps">📍 定位中...</div>
 <div id="p-result" class="punch-result"></div>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
 <button class="btn btn-green" onclick="appPunch('上班')">☀ 上班</button>
@@ -249,7 +249,7 @@ body{font-family:'Noto Sans TC',sans-serif;background:#eef2f7;color:var(--gray6)
 <div class="screen" id="screen-sop">
 <div style="padding:16px;font-size:12px;line-height:1.8;color:#333">
 <div style="font-size:18px;font-weight:700;color:#0f1b35;margin-bottom:4px">📖 員工操作手冊</div>
-<div style="font-size:11px;color:#888;margin-bottom:16px">好洺餐飲事業有限公司 員工APP操作SOP　<span id="sop-ver">v3.26.0</span>　<span style="color:#b45309">（本手冊已與 v3.26.0 實際功能核對）</span></div>
+<div style="font-size:11px;color:#888;margin-bottom:16px">好洺餐飲事業有限公司 員工APP操作SOP　<span id="sop-ver">v3.33.0</span>　<span style="color:#b45309">（本手冊已與 v3.33.0 實際功能核對）</span></div>
 
 <div style="background:#166534;color:#fff;padding:8px 12px;border-radius:6px;font-weight:700;font-size:13px;margin-bottom:6px">📱 介面導覽（新版）</div>
 <div style="padding:4px 8px 12px">
@@ -294,10 +294,23 @@ body{font-family:'Noto Sans TC',sans-serif;background:#eef2f7;color:var(--gray6)
 
 <div style="background:#1e40af;color:#fff;padding:8px 12px;border-radius:6px;font-weight:700;font-size:13px;margin-bottom:6px">三、查看班表 / 換班申請</div>
 <div style="padding:4px 8px 4px"><b>【休息日加班】</b><br>若店長將某日排為「休息日加班」，班表該日會顯示 🌙休息日加班 與時段；當日工時依勞基法休息日費率計薪（前2h×1.34／3-8h×1.67／9-12h×2.67），由管理端結算。</div><div style="padding:4px 8px 4px"><b>【換班申請】</b><br>📅班表頁 → 🔄換班申請 → 選擇日期/對象/原因 → 提交 → 等待店長審核<br>核准後系統自動交換兩人班次</div>
+<div style="padding:4px 8px 4px"><b>【🤝 去別家店支援的班（v3.32.0 新增顯示）】</b><br>
+以前排了支援班，班表上只看得到本店的上下班時間，<b>完全看不出那天要去別家店</b> —— 已修好。現在會這樣顯示：<br>
+<b>① 我的班表</b>　那一天會多出一條<b>青色</b>的「🤝 支援【門市】時間　時薪」。<br>
+　• 若<b>整天都是支援</b>：只有那一條青色的。<br>
+　• 若<b>本店上半天、下半天去支援</b>：上面是本店時間，下面才是青色的支援那一段 —— <u>兩段都要上，不是二選一</u>。<br>
+<b>② 門市班表</b>（班表頁可切「🏪 門市班表」）<br>
+　• 看<b>別店</b>時：別店同仁來支援，會顯示「🤝時間（○○店來支援）」。<br>
+　• 看<b>自己店</b>時：那天要去別店的同仁，會在時間後面標「→支援○○店」。<br>
+<b>③ 打卡</b>　打卡頁當天會跳青色提示「🤝 今天要支援【門市】時間」。<b style="color:#b45309">到那家店打卡前，一定要先把上面的「選擇打卡門市」切成那家店</b>；回本店上班時再切回自己店。整天都是支援的話，系統會自動幫你帶好。<br>
+　<span style="color:#991b1b">門市選錯會把出勤記到別家店，薪資與該店人事成本都會跟著錯，請務必確認。</span><br>
+<b>④ 工作備註</b>　店長若在那天寫了交辦事項（例：醃雞丁），班表該日會有黃色「📝」小卡 —— 跨店支援時這格最重要，去之前先看一下。</div>
 <div style="padding:4px 8px 12px">
 • 點「📅 班表」查看個人當月排班<br>
 • 顯示每日上下班時間、休假日<br>
-• 國定假日、例假以不同顏色標示
+• 國定假日、例假以不同顏色標示<br>
+• 用上方 ◀ ▶ 可以翻看<b>下個月</b>的班（店長排好就看得到，不必等到月初）<br>
+• <b>到職前的月份不會有班（v3.33.0 修正）</b>　新人往前翻到報到之前的月份，會看到「—」，那是正常的。<span style="color:#b45309">舊版會把那些月份每一天都顯示成 09:00 - 17:00，看起來像你那時候就該上班 —— 那是系統補出來的，不是真的班表。</span>
 </div>
 
 <div style="background:#7c3aed;color:#fff;padding:8px 12px;border-radius:6px;font-weight:700;font-size:13px;margin-bottom:6px">四、劃休申請</div>
@@ -308,7 +321,8 @@ body{font-family:'Noto Sans TC',sans-serif;background:#eef2f7;color:var(--gray6)
 <b>Step 4</b>　按「📤 提交劃休申請」<br>
 <b>Step 5</b>　等待店長審核（已核准/已拒絕）<br>
 <b>注意</b>　超過10日系統自動關閉劃休功能<br>
-<b>被拒絕</b>　可按「重新申請」重新選擇日期
+<b>被拒絕</b>　可按「重新申請」重新選擇日期<br>
+<b>誰審核</b>　<b>自己門市的店長</b>（或老闆）。若你當月有排去別店支援，那家店的店長也看得到你的劃休（因為那幾天算他們的人力）。
 </div>
 
 <div style="background:#92400e;color:#fff;padding:8px 12px;border-radius:6px;font-weight:700;font-size:13px;margin-bottom:6px">五、請假申請</div>
@@ -737,7 +751,23 @@ function switchScreen(name){if(name!=='punch'&&typeof _stopGPS==='function')_sto
 
 function renderAll(){if(!curEmp){document.getElementById('home-name').textContent='帳號未綁定員工';var _sub=document.getElementById('home-sub');if(_sub){_sub.innerHTML='<span style="color:#991b1b">此帳號尚未對應到員工資料，無法顯示班表／薪資／打卡。請聯絡管理員設定。</span>'}var _av=document.getElementById('home-avatar');if(_av)_av.textContent='!';var _an=document.getElementById('app-name');if(_an)_an.textContent='未綁定';var _ar=document.getElementById('app-role');if(_ar)_ar.textContent='—';return}document.getElementById('app-name').textContent=curEmp.name;document.getElementById('app-role').textContent=curEmp.role+' · '+(curEmp.store||'');document.getElementById('home-avatar').textContent=curEmp.name[0];document.getElementById('home-name').textContent=curEmp.name;document.getElementById('home-sub').textContent=curEmp.role+' · '+(curEmp.store||'')+' · 到職 '+(curEmp.hire_date||'─');document.getElementById('home-vac').textContent='─';document.getElementById('home-attend').textContent='─';try{HaomingAppDailyRecord.render()}catch(e){}}
 
-function initPunchScreen(){syncStoreHours();hmRefreshStoreSelects();var ps=document.getElementById('p-store');if(ps&&curEmp&&curEmp.store){ps.value=curEmp.store};syncPunchFromFB();updateClock();if(window._pt)clearInterval(window._pt);window._pt=setInterval(updateClock,1000);getGPS();renderPunchToday();loadMakeupHistory()}
+function _todaySup(){try{if(!curEmp||!sched||!sched[curEmp.id])return null;var k=todayStr();return _supOf(sched[curEmp.id][k])}catch(e){return null}}
+/* [v3.32.0] 支援當天最容易出的錯：人在別家店，門市卻還停在本店 —— 打下去出勤就記到錯的店，
+   薪資與該店人事成本都會跟著錯。這裡主動提示，整格都是支援時直接幫他帶對門市。 */
+function _supPunchHint(){
+  var el=document.getElementById('p-sup-hint');
+  var sp=_todaySup();
+  if(!el){el=document.createElement('div');el.id='p-sup-hint';var sel=document.getElementById('p-store');if(sel&&sel.parentNode)sel.parentNode.appendChild(el);}
+  if(!sp){el.style.display='none';el.innerHTML='';return}
+  el.style.cssText='margin-top:6px;padding:8px 10px;background:#ccfbf1;border:2px solid #14b8a6;border-radius:8px;font-size:12px;color:#0f766e;font-weight:700;line-height:1.6';
+  el.innerHTML='🤝 今天要支援【'+hmEsc(sp.store||'')+'】'+_supTxt(sp,true)+'<br>'
+    +'<span style="font-weight:400">到那邊打卡前，請先把上面的門市切成「'+hmEsc(sp.store||'')+'」'
+    +(sp.whole?'（已幫你選好）':'；回本店上班時再切回「'+hmEsc(curEmp&&curEmp.store||'')+'」')+'。</span>';
+  el.style.display='block';
+}
+function initPunchScreen(){syncStoreHours();hmRefreshStoreSelects();var ps=document.getElementById('p-store');if(ps&&curEmp&&curEmp.store){ps.value=curEmp.store};
+try{var _tsp=_todaySup();if(_tsp&&_tsp.whole&&ps)ps.value=_tsp.store}catch(e){}
+try{_supPunchHint()}catch(e){}try{hmUpdateStoreWarn()}catch(e){}syncPunchFromFB();updateClock();if(window._pt)clearInterval(window._pt);window._pt=setInterval(updateClock,1000);getGPS();renderPunchToday();loadMakeupHistory()}
 
 function updateClock(){var n=new Date();document.getElementById('p-clock').textContent=pad(n.getHours())+':'+pad(n.getMinutes())+':'+pad(n.getSeconds());document.getElementById('p-date').textContent=n.getFullYear()+'/'+pad(n.getMonth()+1)+'/'+pad(n.getDate())+' ('+DOW[n.getDay()]+')';}
 
@@ -826,6 +856,47 @@ function hmFillStoreSelect(id,opt){
 function hmRefreshStoreSelects(){
   hmFillStoreSelect('p-store',{placeholder:'請選擇門市'});
   hmFillStoreSelect('app-sched-store');
+  try{hmUpdateStoreWarn()}catch(e){}
+}
+/* ══ [FIX-71] 兩家店的位置太近時，GPS 沒辦法分辨你選對了沒 ═══════════════
+   實例：鴿子廚房（嘉興路76號）與總公司只相距約 12 公尺。兩邊圍籬 200m 幾乎完全重疊，
+   所以「站在 A 店選 B 店打卡」一樣會通過 —— 圍籬能驗證「你人在這個地點」，
+   但驗證不了「你選對了店」。若出勤或薪資是按門市分的，那一段是靠人自己選對。
+   系統擋不住的事，至少要讓現場的人知道。
+
+   刻意不寫死店名：改為即時比對雲端門市設定，只要有任兩家近到彼此在對方圍籬內
+   就會自動提示，日後再開店也不必回來改這支。
+   門檻取兩店半徑的「較小者」—— 避免某些門市設了很大的半徑（例如台積電店 10km）
+   導致全部門市互相誤報。 */
+function hmOverlapStores(store){
+  var out=[];
+  try{
+    var me=(storeHours||{})[store];
+    if(!me||!me.lat||!me.lng)return out;
+    Object.keys(storeHours).forEach(function(s){
+      if(s===store)return;
+      var o=storeHours[s];
+      if(!o||!o.lat||!o.lng)return;
+      var d=gpsDist(me.lat,me.lng,o.lat,o.lng);
+      var r=Math.min((+me.radius||200),(+o.radius||200));
+      if(d<=r)out.push({name:s,dist:Math.round(d)});
+    });
+  }catch(e){}
+  return out;
+}
+function hmUpdateStoreWarn(){
+  var el=document.getElementById('p-store-warn');
+  if(!el)return;
+  var sel=document.getElementById('p-store');
+  var v=sel?sel.value:'';
+  if(!v){el.style.display='none';el.innerHTML='';return}
+  var near=hmOverlapStores(v);
+  if(!near.length){el.style.display='none';el.innerHTML='';return}
+  var names=near.map(function(x){return hmEsc(x.name)+'（約 '+x.dist+'m）'}).join('、');
+  el.innerHTML='⚠ <b>此地點有兩家以上的店，請確認選對</b><br>'
+    +'附近還有：'+names+'<br>'
+    +'<span style="font-size:11px">這幾家距離太近，GPS 沒辦法分辨你選的是哪一家 —— 選錯不會被系統擋下來，但出勤會記到別家店。</span>';
+  el.style.display='block';
 }
 function gpsDist(a,b,c,d){var R=6371000,dL=(c-a)*Math.PI/180,dN=(d-b)*Math.PI/180,x=Math.sin(dL/2)*Math.sin(dL/2)+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dN/2)*Math.sin(dN/2);return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x))}
 
@@ -890,14 +961,48 @@ function changeMonth(d){viewM+=d;if(viewM>12){viewM=1;viewY++}if(viewM<1){viewM=
 function _renderSchedCurrentView(){if(schedViewMode==='store')renderSchedStore();else renderSched()}
 function loadViewSched(){_viewSched=null;_renderSchedCurrentView();if(!db)return;db.collection(fbEnv+'_schedules').doc((viewY+1911)+'-'+pad(viewM)).get().then(function(s){_viewSched=s.exists?(s.data().data||{}):{};_renderSchedCurrentView()}).catch(function(){})}
 
+/* [v3.32.0] ★ 根因修正：支援班在員工APP完全看不到
+   管理端排「支援時薪」時，資料有兩種形狀：
+     Ａ 整格就是支援  → {type:'support', store, sh,sm,eh,em, rate, mode}
+     Ｂ 支援附掛在本店班上 → {type:'work', sh,sm,eh,em, sup:{store,sh,sm,eh,em,rate,mode}}
+   實際雲端資料幾乎都是 Ｂ（因為支援通常是本店班之外再去幫忙），
+   而舊版APP只認得 Ａ，所以支援班一律落到「一般班次」那一支，
+   員工只看到本店的上下班時間，完全不知道那天要去別家店。
+   本函式把兩種形狀統一解讀，APP 各頁一律改用它。 */
+function _supOf(sc){
+  if(!sc)return null;
+  if(sc.type==='support'&&sc.store)return{store:sc.store,sh:sc.sh,sm:sc.sm,eh:sc.eh,em:sc.em,rate:sc.rate,mode:sc.mode,whole:true};
+  if(sc.sup&&sc.sup.store)return{store:sc.sup.store,sh:sc.sup.sh,sm:sc.sup.sm,eh:sc.sup.eh,em:sc.sup.em,rate:sc.sup.rate,mode:sc.sup.mode,whole:false};
+  return null;
+}
+/* wide=true 用於「我的班表」（該頁其他班次是 09:00 - 17:00，要一致）；
+   省略則用緊湊格式，供「門市班表」一行多人時使用。 */
+function _supTxt(sp,wide){if(!sp)return '';return fT(sp.sh,sp.sm)+(wide?' - ':'-')+fT(sp.eh,sp.em)}
+function _supBar(sp){
+  if(!sp)return '';
+  var r=(sp.mode!=='overtime'&&sp.rate>0)?('\u3000'+sp.rate+' \u5143/\u6642'):'';
+  return '<div style="flex:1 1 100%;margin-top:4px;font-size:12px;font-weight:700;color:#0f766e;background:#ccfbf1;border:1px solid #5eead4;border-radius:6px;padding:4px 8px">\ud83e\udd1d \u652f\u63f4\u3010'+hmEsc(sp.store||'')+'\u3011\u3000'+_supTxt(sp,true)+r+'</div>';
+}
+/* [v3.33.0] ★ 與人資系統 v4.9.18 同一個根因：
+   這一天沒有排班資料時，APP 會自動顯示「員工的預設上下班時間」。
+   但到職前（翻到以前的月份）與離職後的日子不可以這樣補 ——
+   新人翻看上個月，會看到整個月都排了班，誤以為自己那時就該上班。 */
+function _onDutyDay(key){
+  if(!curEmp)return false;
+  if(curEmp.hire_date&&String(curEmp.hire_date)>key)return false;
+  if(curEmp.leave_date&&String(curEmp.leave_date)<key)return false;
+  return true;
+}
 function renderSched(){document.getElementById('sched-month').textContent='民國'+viewY+'年'+viewM+'月';if(!curEmp){document.getElementById('sched-list').innerHTML='<div style="text-align:center;padding:20px;color:var(--gray4)">未綁定員工</div>';return}var D=new Date(viewY+1911,viewM,0).getDate();var h='';var SRC=(_viewSched!==null)?_viewSched:sched;for(var d=1;d<=D;d++){var dt=new Date(viewY+1911,viewM-1,d);var dw=dt.getDay();var key=(viewY+1911)+'-'+pad(viewM)+'-'+pad(d);var sc=SRC[curEmp.id]?SRC[curEmp.id][key]:null;var isWknd=dw===0||dw===6;var dayColor=isWknd?'#991b1b':'var(--gray6)';h+='<div class="sched-day" style="'+(isWknd?'background:#fff5f5;border-radius:8px;padding:10px;margin:-2px -4px':'')+'"><span class="day" style="color:'+dayColor+'">'+viewM+'/'+d+'<br><span style="font-size:11px;color:var(--gray4)">('+DOW[dw]+')</span></span>';if(sc&&LEAVE.indexOf(sc.type)>=0){var lc=sc.type==='例假'?'#166534':sc.type==='特休'?'#0e7490':sc.type==='事假'?'#991b1b':'#6d28d9';h+='<span class="leave" style="color:'+lc+'">'+sc.type+'</span>'}else if(sc&&sc.type==='restOT'){h+='<span class="leave" style="color:#1e40af">🌙休息日加班 '+fT(sc.sh,sc.sm)+'-'+fT(sc.eh,sc.em)+'</span>'}
   /* [v3.29.0] 支援班原本落到最後那個 else，顯示成一般班次 —— 只有一個小小的門市標籤，
      員工不容易發現「這天要去別家店」。改成明確標示，並帶出時薪。 */
-  else if(sc&&sc.type==='support'){
-    var _sr=(sc.mode!=='overtime'&&sc.rate>0)?(' · '+sc.rate+'元/時'):'';
-    h+='<span class="time" style="color:#0f766e;font-weight:700">🤝 支援 '+hmEsc(sc.store||'')+'　'+fT(sc.sh,sc.sm)+' - '+fT(sc.eh,sc.em)+_sr+'</span>';
+  else if(sc&&_supOf(sc)&&_supOf(sc).whole){
+    var _sp0=_supOf(sc);
+    h+='<span class="time" style="color:#0f766e;font-weight:700">🤝 支援【'+hmEsc(_sp0.store)+'】　'+_supTxt(_sp0,true)+((_sp0.mode!=='overtime'&&_sp0.rate>0)?('　'+_sp0.rate+' 元/時'):'')+'</span>';
   }
-  else if(sc){h+='<span class="time">'+fT(sc.sh,sc.sm)+' - '+fT(sc.eh,sc.em)+(sc.store&&sc.store!==curEmp.store?' <span style="font-size:10px;background:#7c3aed;color:#fff;padding:1px 6px;border-radius:4px;margin-left:4px">'+hmEsc(sc.store)+'</span>':'')+'</span>'}else if(dw===0){h+='<span class="leave" style="color:#166534">例假</span>'}else if(curEmp){h+='<span class="time">'+fT(curEmp.sh||9,curEmp.sm||0)+' - '+fT(curEmp.eh||17,curEmp.em||0)+'</span>'}/* [v3.29.0] 顯示老闆／店長寫在那一天的工作備註（跨店支援時最重要：去了要做什麼） */
+  else if(sc){h+='<span class="time">'+fT(sc.sh,sc.sm)+' - '+fT(sc.eh,sc.em)+(sc.store&&sc.store!==curEmp.store?' <span style="font-size:10px;background:#7c3aed;color:#fff;padding:1px 6px;border-radius:4px;margin-left:4px">'+hmEsc(sc.store)+'</span>':'')+'</span>'}else if(!_onDutyDay(key)){h+='<span class="leave" style="color:#9ca3af">—</span>'}/* [v3.33.0] 到職前／離職後不補預設班 */else if(dw===0){h+='<span class="leave" style="color:#166534">例假</span>'}else if(curEmp){h+='<span class="time">'+fT(curEmp.sh||9,curEmp.sm||0)+' - '+fT(curEmp.eh||17,curEmp.em||0)+'</span>'}/* [v3.29.0] 顯示老闆／店長寫在那一天的工作備註（跨店支援時最重要：去了要做什麼） */
+  /* [v3.32.0] 支援附掛在本店班上時，本店班照顯示，另外加一條支援列 */
+  try{var _spA=_supOf(sc);if(_spA&&!_spA.whole)h+=_supBar(_spA)}catch(e){}
   try{
     var _dn=(appDayNote&&curEmp&&appDayNote[curEmp.id]&&appDayNote[curEmp.id][key])||'';
     if(_dn)h+='<div style="flex:1 1 100%;margin-top:4px;font-size:12px;color:#92400e;background:#fef3c7;border-radius:6px;padding:4px 8px">📝 '+hmEsc(_dn)+'</div>';
@@ -1300,8 +1405,14 @@ function _appPunchFail(e,rec){
 function syncPunchFromFB(){if(!curEmp||!db)return;_readPunchMonths([ymStr()]).then(function(data){var myToday=data.filter(function(r){if(!r)return false;var now=new Date();var today=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());return r.eid===curEmp.id&&r.date===today});if(myToday.length>0){var local=JSON.parse(localStorage.getItem('hm_app_punch')||'[]');myToday.forEach(function(r){if(!local.find(function(x){return x.id===r.id}))local.push(r)});localStorage.setItem('hm_app_punch',JSON.stringify(local));renderPunchToday()}}).catch(function(){})}
 
 
-var APP_VERSION='3.30.0';
+var APP_VERSION='3.33.0';
 var APP_CHANGELOG=[
+{ver:'3.33.0',date:'2026-10-03',changes:['【本版來源】與人資系統 v4.9.18 同一個根因。老闆回報「10月才報到的新人為什麼會顯示在過去的月份」。','【★修正·到職前的月份會顯示整個月的假班表】APP 在「這一天沒有排班資料」時，會自動顯示員工的預設上下班時間。新人往前翻月份時，那些月份本來就沒有任何排班 —— 結果整個月（扣掉週日）每一天都顯示 09:00 - 17:00，新人會誤以為自己那時候就該上班。已改為：到職前與離職後的日子顯示「—」，不再補假班表。','【實測】10/1 到職的員工翻看 115年8月與9月：修正前各顯示 26 天假班表，修正後 0 天；10月（到職當月）照常顯示 27 天，不受影響。','【判斷邊界】到職當天算在職、離職當天算在職；沒有填到職日的人行為與舊版完全相同。','【SOP 同步】員工手冊「三、查看班表」補上說明：到職前的月份不會有班，那是正常的。']},
+{ver:'3.32.0',date:'2026-10-03',changes:['【本版來源】老闆 2026-10-03 回報「支援班表無法顯示在員工APP內」。','【★★ 根因·支援班完全看不到】支援資料有兩種形狀：Ａ整格就是支援（type:support）、Ｂ支援附掛在本店班上（sup:{…}）。實際雲端資料幾乎都是Ｂ，而本APP 全檔搜尋 .sup 的結果是「0 次」—— 只認得Ａ，Ｂ一律落到「一般班次」，員工只看到本店的上下班時間，完全不知道那天要去別家店。新增統一解讀函式 _supOf()，兩種形狀都認得，各頁一律改用它。','【★修正·我的班表】整格支援＝顯示青色「🤝 支援【門市】時間　時薪」；本店班＋支援段＝本店時間照顯示，下面另加一條青色支援列（兩段都要上，不是二選一）。時間格式與該頁其他班次統一為 09:00 - 17:00。','【★★修正·門市班表看不到有人要來支援】範圍判斷原本只看「員工主要門市」與「格子的 store」，而支援門市寫在 sup.store —— A店的人去支援B店時，B店同仁與店長根本看不到有人要來。已修正：被支援門市顯示「🤝時間（○○店來支援）」；原門市在該員本店班後面標「→支援○○店」，店長看得出人力缺口。另修正整格支援時 sc.store 存的是「支援去哪一家」而非他自己的店，不可當作「屬於這家店」的依據。','【新增·支援當天的打卡防呆】打卡頁當天跳青色提示「🤝今天要支援【門市】時間」，提醒到那邊打卡前先把門市切過去、回本店再切回來；整天都是支援時自動帶好門市。門市選錯會把出勤記到別家店，薪資與該店人事成本都會跟著錯。','【驗證】兩種資料形狀 × 三種視角（本人班表／被支援門市／原門市）全部實測通過；node --check 三個 script 區塊皆通過；既有 APP 測試（appsched、apptest、apprscan、looptest）全數通過，無載入錯誤。','【SOP 同步】員工手冊「三、查看班表」新增「🤝去別家店支援的班」完整四點（我的班表／門市班表／打卡門市務必切換／工作備註），並補充可用 ◀▶ 翻看下個月；「四、劃休申請」補上審核範圍說明（自己門市店長，支援期間該店店長也看得到）。']},
+{ver:'3.31.0',date:'2026-09-06',changes:[
+'【新增·門市位置太近時提醒「請確認選對」】鴿子廚房（嘉興路76號）與總公司只相距約 12 公尺，兩邊 200m 圍籬幾乎完全重疊 —— 站在其中一家選另一家打卡也會通過。圍籬能驗證「你人在這個地點」，但驗證不了「你選對了店」；若出勤或薪資按門市分，那一段是靠人自己選對。系統擋不住的事，至少要讓現場的人看得到：打卡頁選到這種門市時會出現黃色提示，並列出附近還有哪幾家、相距多少公尺。<b>刻意不寫死店名</b> —— 改為即時比對雲端門市設定，日後再開店也會自動提示；門檻取兩店半徑的較小者，避免半徑設很大的門市（台積電店 10km）造成全部互相誤報',
+'【併版】本版以 v3.30.0 為底（含「補打卡核准後作廢舊紀錄」的修正），加上本項門市重疊提示'
+]},
 {ver:'3.30.0',date:'2026-09-06',changes:['【★修正·補打卡核准後，錯的那筆還在】老闆回報「員工若打卡錯誤，使用補打卡功能無法覆蓋原有紀錄」。查下來：員工自己按打卡的那條路徑早就有覆蓋機制（會問要不要覆蓋、把舊的標記作廢），但「補打卡申請核准」這條完全沒有 —— 核准後只是再加一筆，同一天同一種卡變成兩筆，錯的那筆還在。之後遲到分鐘、工時、全勤判定會以先找到的那一筆為準，也就是錯的那筆。已改為核准時先把同一天同一種的舊紀錄標記作廢（不實體刪除，雲端仍查得到軌跡），再寫入新的，並在成功訊息中告知原本那筆幾點被作廢。人資系統端（v4.9.13）同步修正，兩邊用同一套規則。']},
 {ver:'3.29.1',date:'2026-09-06',changes:['【★修正·支援班在APP上看起來就是一般班】老闆問「選擇支援，員工APP 看得到需要支援的排班嗎？」。實測：時間看得到、支援門市也有一個小紫標籤，但整格是走「一般班次」那條分支顯示的 —— 沒有「支援」兩個字，員工很容易以為是自己店的班。已改為明確顯示「🤝 支援 ○○店　時間」，並在時薪／固定時薪模式時帶出時薪。','【★新增·排班備註終於看得到】老闆與店長寫在排班格上的當日備註（例：醃雞丁、送貨）原本只存在管理端，APP 完全沒有讀這份資料（empDayNote），員工看不到。跨店支援時最要命 —— 人被派去別家店，卻不知道要做什麼。已改為載入並在該日班次下方以黃色標籤顯示，且只讀取自己的那一份（與薪資、支援薪資相同的隱私處理）。','【致謝·併版】本版建立在 v3.29.0 之上。v3.29.0 攔下了我在 v3.28.0 引入的一個嚴重錯誤：登入前等待匿名驗證時，旗標在重新呼叫 appLogin() 之前就被歸零，造成微任務無限迴圈，APP 會在登入時整個凍結。已重新實測確認：v3.28.0 重入超過 500 次後爆掉，v3.29.0 只重入 2 次後正常完成。']},
 {ver:'3.29.0',date:'2026-09-06',changes:[
@@ -2011,14 +2122,30 @@ function renderSchedStore(){
       if(e.leave_date&&e.leave_date<key)return;
       var sc=SRC[e.id]?SRC[e.id][key]:null;
       if(!sc)return;
-      if(e.store!==store&&(!sc.store||sc.store!==store))return;
+      /* [v3.32.0] ★ 根因修正：跨店支援的人不會出現在被支援門市的班表裡。
+         舊版範圍判斷只看「員工主要門市」跟「格子的 store」，而支援門市是寫在
+         sup.store，所以 A 店的人要去支援 B 店時，B 店同仁在門市班表上
+         根本看不到有人要來幫忙，店長也無法據此判斷人力。 */
+      var _sp=_supOf(sc);
+      /* 整格都是支援時，sc.store 存的是「支援去哪一家」而不是他自己的店，
+         不能拿它當「他屬於這家店」的依據，否則被支援門市會把來幫忙的人誤判成自己人。 */
+      var _isHere=(e.store===store)||(!!sc.store&&sc.store===store&&!(_sp&&_sp.whole));
+      var _supHere=!!(_sp&&_sp.store===store);
+      if(!_isHere&&!_supHere)return;
+      if(_supHere&&!_isHere){
+        dayStaff.push({id:e.id,name:e.name,text:'🤝'+_supTxt(_sp)+'（'+(e.store||'別店')+'來支援）',color:'#0f766e'});
+        return;
+      }
       /* [FIX-48] 舊版用「姓名一樣」判斷哪一列是自己 —— 門市有同名同事時會標錯人。改用員工編號。 */
       if(LEAVE.indexOf(sc.type)>=0){
         dayStaff.push({id:e.id,name:e.name,text:sc.type,color:'#6d28d9'});
       }else if(sc.type==='restOT'){
         dayStaff.push({id:e.id,name:e.name,text:'🌙'+fT(sc.sh,sc.sm)+'-'+fT(sc.eh,sc.em),color:'#1e40af'});
+      }else if(_sp&&_sp.whole){
+        dayStaff.push({id:e.id,name:e.name,text:'→支援'+(_sp.store||'')+' '+_supTxt(_sp),color:'#92400e'});
       }else{
-        dayStaff.push({id:e.id,name:e.name,text:fT(sc.sh,sc.sm)+'-'+fT(sc.eh,sc.em),color:'#0369a1'});
+        /* [v3.32.0] 本店班；若這天還要去別店支援，一併標註，店長才看得出人力缺口 */
+        dayStaff.push({id:e.id,name:e.name,text:fT(sc.sh,sc.sm)+'-'+fT(sc.eh,sc.em)+((_sp&&_sp.store!==store)?('　→支援'+_sp.store+' '+_supTxt(_sp)):''),color:'#0369a1'});
       }
     });
     if(dayStaff.length===0){
