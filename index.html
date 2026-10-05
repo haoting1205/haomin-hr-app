@@ -526,7 +526,7 @@ function _showVerBanner(v){if(document.getElementById('sysver-banner'))return;va
 setTimeout(checkAppVer,9000);setInterval(checkAppVer,1800000);
 
 var _DEFAULT_FB={apiKey:'AIzaSyAk8D1oXTYaq9E1t96bPW-1rMu0EhW1JzQ',projectId:'haomin-system',authDomain:'haomin-system.firebaseapp.com',storageBucket:'haomin-system.firebasestorage.app',appId:'1:348193196599:web:a454b20e4145041e39cdb2'};
-var db=null,curEmp=null,curAcct=null,staff=[],sched={},leaveRecords=[],payHistory={},appSupportPay={},punchRecords=[],storeHours={'總公司':{lat:24.81472,lng:121.02525,radius:200},'交大店':{lat:24.78374,lng:120.99706,radius:200},'台積電店':{lat:24.76619,lng:121.00812,radius:10000}},STORE_GEO={'總公司':{lat:24.81472,lng:121.02525,radius:200},'交大店':{lat:24.78374,lng:120.99706,radius:200},'台積電店':{lat:24.76619,lng:121.00812,radius:10000}},fbEnv='prod';
+var db=null,curEmp=null,curAcct=null,staff=[],sched={},leaveRecords=[],payHistory={},appSupportPay={},punchRecords=[],storeHours={'總公司':{lat:24.81472,lng:121.02525,radius:200},'交大店':{lat:24.78374,lng:120.99706,radius:200},'台積電店':{lat:24.76619,lng:121.00812,radius:500}},STORE_GEO={'總公司':{lat:24.81472,lng:121.02525,radius:200},'交大店':{lat:24.78374,lng:120.99706,radius:200},'台積電店':{lat:24.76619,lng:121.00812,radius:500}},fbEnv='prod';
 var viewY=new Date().getFullYear()-1911,viewM=new Date().getMonth()+1;
 function pad(n){return String(n).padStart(2,'0')}
 function fNT(v){return'NT$'+Math.round(v).toLocaleString()}
@@ -938,7 +938,7 @@ var _pd=null;if(!_noGps&&!_noGeo&&_psh.lat){_pd=gpsDist(_lat,_lng,_psh.lat,_psh.
 var _ACC_CAP=200;var _tol=Math.min(_gpsAcc||0,_ACC_CAP);if(_pd>((_psh.radius||200)+_tol)){var _accNote=((_gpsAcc||0)>_ACC_CAP)?('\n\n\u203b \u76ee\u524d GPS \u8aa4\u5dee\u00b1'+Math.round(_gpsAcc)+'m\uff0c\u5df2\u8d85\u904e\u7cfb\u7d71\u5141\u8a31\u7684 '+_ACC_CAP+'m \u4e0a\u9650\uff0c\n\u3000\u6700\u591a\u53ea\u80fd\u653e\u5bec '+_ACC_CAP+'m\u3002\u8acb\u5230\u7a7a\u66e0\u8655\u7b49\u5b9a\u4f4d\u7a69\u5b9a\u518d\u6253\uff0c\n\u3000\u6216\u6539\u7528\u300c\u88dc\u6253\u5361\u7533\u8acb\u300d\u3002'):'';alert('\u26a0 \u4e0d\u5728\u300c'+pStore.value+'\u300d\u7bc4\u570d\u5167\n\n\u76ee\u524d\u8ddd\u96e2\uff1a'+Math.round(_pd)+'m\uff08GPS\u8aa4\u5dee\u00b1'+Math.round(_gpsAcc||0)+'m\uff09\n\u5141\u8a31\u7bc4\u570d\uff1a'+(_psh.radius||200)+'m\uff08\u6700\u591a\u518d\u653e\u5bec '+_tol+'m\uff09'+_accNote+'\n\n\u8acb\u5728\u9580\u5e02\u7bc4\u570d\u5167\u3001\u6216\u65bc\u7a7a\u66e0\u8655\u5f85\u5b9a\u4f4d\u7cbe\u6e96\u5f8c\u518d\u6253\u5361');hmUnlock('punch:'+type);return}}/* PIN已取消 */var now=new Date();var today=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());var time=pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds());var rec={id:hmId('p'),eid:curEmp.id,name:curEmp.name,store:(pStore?pStore.value:curEmp.store)||'',date:today,time:time,type:type,gps:_lat?(_lat.toFixed(5)+','+_lng.toFixed(5)):'無定位',acc:(_gpsAcc?Math.round(_gpsAcc):null),dist:(_pd!==null&&_pd!==undefined?Math.round(_pd):null),needChk:(_noGps||_noGeo||(_gpsAcc||0)>200)/* [v3.35.0] 與誤差上限一致 */,chkWhy:(_noGeo?'門市未設座標':(_noGps?'無定位':((_gpsAcc||0)>200?'定位誤差過大':''))),ts:now.toISOString()};var local=JSON.parse(localStorage.getItem('hm_app_punch')||'[]');local.push(rec);localStorage.setItem('hm_app_punch',JSON.stringify(local));/* [FIX-25] 上傳成功與否要讓員工看得到，不能只顯示「打卡成功」 */
 if(db&&navigator.onLine){
   _punchDocOf(rec.date).set({data:firebase.firestore.FieldValue.arrayUnion(rec),ym:_appPmk(rec.date),updated:new Date().toISOString()},{merge:true})
-    .then(function(){var _r=document.getElementById('p-result');
+    .then(function(){_stampPunchSrvTime(rec);var _r=document.getElementById('p-result');
       if(_r&&_r.dataset&&_r.dataset.pid===rec.id){var _m=document.getElementById('p-sync-'+rec.id);
         if(_m){_m.style.color='#166534';_m.textContent='✔ 已上傳雲端'}}})
     .catch(function(e){
@@ -1402,6 +1402,41 @@ function _readPunchMonths(months){
     return out;
   });
 }
+/* ══ [FIX-72] 打卡紀錄加上「伺服器時間戳」—— 讓偽造的時間查得出來 ═══════════
+   稽核發現：打卡紀錄裡的 ts 是手機自己給的，可以任意偽造，而且兩套系統都沒有
+   任何伺服器端時間可以比對。後果是「事後完全無法鑑識」——
+   不管是裝假定位 App、手改離線佇列補造過去的工時、還是完全不開 APP 直接寫入雲端，
+   雲端看到的紀錄都跟真的打卡一模一樣。
+
+   ⚠ Firestore 的限制：serverTimestamp() 不能放在陣列元素裡，而打卡是用 arrayUnion
+     存進 data 陣列的，所以沒辦法直接塞進打卡紀錄本身。
+     改為每一筆打卡另外寫一份「時間憑證」文件 prod_punch_srv/{打卡編號}，
+     裡面同時存「手機說的時間 cliTs」與「伺服器實際收到的時間 srvTs」。
+
+   這能查出什麼：
+     · 兩個時間差太多 → 這筆的時間是假的（例如補造上個月的打卡，srvTs 會是今天）
+     · 有打卡紀錄卻沒有對應的時間憑證 → 這筆沒經過 APP（直接寫雲端）
+   這擋不住什麼：
+     · 擋不住即時的假定位（人在家、時間是真的當下）—— 那要靠 App Check 與伺服器端驗算
+     · 鐵了心的人也可以自己補寫這份憑證；這是提高門檻與留下軌跡，不是防彈
+
+   設計上刻意「最多只是best-effort」：寫失敗只在主控台留訊息，絕不影響打卡本身。 */
+function _stampPunchSrvTime(recs){
+  try{
+    if(!db||!window.firebase||!firebase.firestore||!firebase.firestore.FieldValue)return Promise.resolve();
+    var list=[].concat(recs||[]).filter(function(r){return r&&r.id});
+    if(!list.length)return Promise.resolve();
+    return Promise.all(list.map(function(r){
+      return db.collection(fbEnv+'_punch_srv').doc(String(r.id)).set({
+        pid:String(r.id),eid:r.eid||'',name:r.name||'',store:r.store||'',
+        date:r.date||'',time:r.time||'',type:r.type||'',
+        cliTs:r.ts||'',                                   /* 手機說的時間 */
+        srvTs:firebase.firestore.FieldValue.serverTimestamp(),  /* 伺服器實收時間 */
+        src:r.makeupOf?'補打卡核准':(r.offline?'離線補送':'即時打卡')
+      }).catch(function(e){console.warn('[打卡] 時間憑證寫入失敗（不影響打卡）：',(e&&e.message)||e)});
+    })).then(function(){});
+  }catch(e){return Promise.resolve()}
+}
 /* 打卡寫入雲端失敗絕對不可以靜默 */
 function _appPunchFail(e,rec){
   console.error('[打卡] 寫入雲端失敗',e);
@@ -1410,8 +1445,15 @@ function _appPunchFail(e,rec){
 function syncPunchFromFB(){if(!curEmp||!db)return;_readPunchMonths([ymStr()]).then(function(data){var myToday=data.filter(function(r){if(!r)return false;var now=new Date();var today=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());return r.eid===curEmp.id&&r.date===today});if(myToday.length>0){var local=JSON.parse(localStorage.getItem('hm_app_punch')||'[]');myToday.forEach(function(r){if(!local.find(function(x){return x.id===r.id}))local.push(r)});localStorage.setItem('hm_app_punch',JSON.stringify(local));renderPunchToday()}}).catch(function(){})}
 
 
-var APP_VERSION='3.35.0';
+var APP_VERSION='3.36.0';
 var APP_CHANGELOG=[
+{ver:'3.36.0',date:'2026-10-03',changes:[
+'【本版來源】老闆再次要求獨立稽核定位打卡的後門。v3.35.0 已修掉「GPS 誤差沒有上限」（實測確認有效），本版處理另外兩項。',
+'【★修正·台積電店的圍籬是 10 公里，等於沒有驗證】實測：人在 7.3 公里外選台積電店打卡<b>直接成功</b>，而且標記為 needChk=false（＝已驗證、主管不會複核）。依老闆 2026-10-03 決定改為 500 公尺（園區廠辦容許稍大）。<b>⚠ 重要：APP 的內建值只是備援，雲端（管理端「🕐 開閉店時間」）的設定優先 —— 管理端那邊也必須改成 500，否則 10 公里會繼續生效。</b>已實測三種情況：管理端 10000m → 仍可從 7 公里外打卡；管理端 500m → 擋下；管理端未設 → 用 APP 內建 500m 擋下',
+'【★新增·打卡時間憑證（伺服器時間戳）】稽核發現打卡紀錄的時間（ts）是手機自己給的、可任意偽造，而兩套系統都沒有任何伺服器端時間可比對 —— 等於事後完全無法鑑識。現在每一筆打卡會另外寫一份憑證到 prod_punch_srv，同時保存「手機說的時間」與「伺服器實際收到的時間」。可查出：①兩個時間差太多 → 時間是假的（例如補造上個月的工時，伺服器時間會是今天）②有打卡紀錄卻查不到憑證 → 這筆沒經過 APP。（Firestore 不允許 serverTimestamp 放在陣列元素裡，而打卡是存進陣列的，所以只能用另一份文件的方式）',
+'【設計·憑證絕不影響打卡】憑證寫入失敗只在主控台留訊息，員工不會看到任何錯誤、打卡照樣成功。已實測。',
+'【★未解決·必須讓老闆知道】下列手法前端擋不住，不是程式寫錯，而是「驗證做在員工手機上」的本質限制：①手機裝假定位 App（回報門市座標、誤差 5m，雲端紀錄與真的打卡完全無法區分）②直接改手機暫存的離線打卡佇列，可補造任意日期的工時 ③Firestore 規則目前是 allow create: if true，連登入都不用就能寫入打卡。要真正封住需要：App Check ＋ 收緊 Firestore 規則 ＋ Cloud Functions 伺服器端重算距離。建議就個資與工時爭議風險找專業人員評估'
+]},
 {ver:'3.35.0',date:'2026-10-03',changes:['【本版來源】老闆要求確認定位打卡有沒有後門，稽核後發現的問題。','【★修正·GPS 誤差沒有上限，圍籬形同虛設】舊版的允許範圍 = 門市半徑 + 手機回報的誤差，而且沒有上限 —— 手機回報誤差 5000 公尺，允許範圍就變成 5200 公尺，等於 5 公里內都打得到卡。而誤差值是手機給的，假定位 App 可以隨便填。依老闆 2026-10-03 決定設 200 公尺上限。實測：門市半徑 200m、人在 3 公里外、誤差偽報 5000m —— 修正前打卡成功，修正後被擋下，並明確說明「已超過系統允許的 200m 上限，最多只能放寬 200m，請到空曠處等定位穩定再打，或改用補打卡申請」。','【調整·待確認門檻與上限一致】打卡紀錄標記「定位誤差過大」的門檻由 500m 收緊為 200m，與新的誤差上限一致。','【配合·管理端 v4.9.20】員工APP 打卡時標記的「待確認」（needChk/chkWhy），管理端的打卡紀錄查詢原本讀不到、完全不顯示 —— 管理端已修好，現在會顯示「⚠待確認・原因」。APP 端的承諾（此筆由主管核對）現在真的兌現了。','【未改·打卡流程與把關完全不變】範圍外仍是直接拒絕；拿不到定位、門市沒設座標仍是詢問後可打並標記待確認；離線打卡、防重複、防連點都不變。','【SOP 同步】「二、每日打卡」新增 GPS 誤差上限說明與打不了卡時的三個處理步驟，並明確告知不要安裝修改定位的 App。']},
 {ver:'3.34.0',date:'2026-10-03',changes:['【本版來源】配合人資系統 v4.9.19 對「跨店支援如何計薪」的釐清，補上員工端看得懂的說明。','【SOP 補充·支援那天的薪水怎麼算】「六、查看薪資」新增三點：①整天都去別店支援 → 那天不算本店工時，整天由支援門市以 時數×支援時薪 計算；兼職同仁那天本店是 0 元，不是漏算，而是改由支援門市付。②本店上半天、下半天去支援 → 兩段分別計算，都領得到。③支援時薪是公司事先設定、與本店時薪可能不同，金額會顯示在班表那一條青色支援列上，發薪前就看得到。','【未改·功能完全沒動】本版只補手冊文字，沒有改任何程式邏輯或畫面行為。']},
 {ver:'3.33.0',date:'2026-10-03',changes:['【本版來源】與人資系統 v4.9.18 同一個根因。老闆回報「10月才報到的新人為什麼會顯示在過去的月份」。','【★修正·到職前的月份會顯示整個月的假班表】APP 在「這一天沒有排班資料」時，會自動顯示員工的預設上下班時間。新人往前翻月份時，那些月份本來就沒有任何排班 —— 結果整個月（扣掉週日）每一天都顯示 09:00 - 17:00，新人會誤以為自己那時候就該上班。已改為：到職前與離職後的日子顯示「—」，不再補假班表。','【實測】10/1 到職的員工翻看 115年8月與9月：修正前各顯示 26 天假班表，修正後 0 天；10月（到職當月）照常顯示 27 天，不受影響。','【判斷邊界】到職當天算在職、離職當天算在職；沒有填到職日的人行為與舊版完全相同。','【SOP 同步】員工手冊「三、查看班表」補上說明：到職前的月份不會有班，那是正常的。']},
@@ -1604,8 +1646,7 @@ function syncOfflinePunches(){
     return db.collection(fbEnv+'_punch').doc(m)
       .set({data:firebase.firestore.FieldValue.arrayUnion.apply(null,byM[m]),ym:m,updated:new Date().toISOString()},{merge:true});
   });
-  Promise.all(jobs).then(function(){
-    offlinePunchQueue=[];localStorage.removeItem('hm_offline_punch');showOfflineStatus();
+  Promise.all(jobs).then(function(){_stampPunchSrvTime(queue.map(function(r){var x=Object.assign({},r);x.offline=1;return x}));offlinePunchQueue=[];localStorage.removeItem('hm_offline_punch');showOfflineStatus();
     console.log('Synced '+queue.length+' offline punches');
   }).catch(function(e){
     /* 失敗時佇列保留，不清空 —— 舊版是靜默吞掉，下次還會再試 */
@@ -1937,7 +1978,7 @@ function mgrApproveMakeup(id){
     };
     window.__mkVoided='';
     return _voidOld().then(function(){return _punchDocOf(r.date).set({data:firebase.firestore.FieldValue.arrayUnion(prec),ym:_appPmk(r.date),updated:new Date().toISOString()},{merge:true})})
-      .then(function(){return _mkStamp(function(x){x.punchWritten=true}).then(function(){
+      .then(function(){_stampPunchSrvTime(prec);return _mkStamp(function(x){x.punchWritten=true}).then(function(){
         alert('✅ 打卡紀錄已寫入 '+r.date+' '+r.time+(window.__mkVoided?('\n\n原本的「'+r.type+' '+window.__mkVoided+'」已標記作廢，只留這一筆。'):''));loadMgrApprove()})})
       .catch(function(e){return _mkStamp(function(x){x.status='待審核';x.punchWritten=false;x.lastError='打卡寫入失敗：'+e.message}).then(function(){
         alert('⚠ 打卡紀錄寫入失敗：'+e.message+'\n\n這張單已「退回待審核」，網路正常後再核准一次即可（不會重複寫入）。');loadMgrApprove()})});
